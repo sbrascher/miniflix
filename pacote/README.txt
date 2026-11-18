@@ -116,12 +116,14 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
 --------------------------------------------------------------------------
 
   MiniFlix.exe ... o programa
+  README.txt ..... este guia
+  bin\ ........... ferramentas usadas pelo MiniFlix (yt-dlp, ffmpeg,
+                   deno e, na versão completa, o componente WebView2)
+  ui\ ............ a interface do programa
+
+  Criadas na primeira vez que o MiniFlix é aberto:
   videos\ ........ seus vídeos (uma pasta por vídeo)
   data\ .......... configurações, posição de cada vídeo e registros
-  bin\ ........... ferramentas usadas pelo MiniFlix (yt-dlp, ffmpeg,
-                   deno e, se presente, o componente WebView2)
-  ui\ ............ a interface do programa
-  (demais arquivos .dll e .json: partes do programa - não apague)
 
 
 --------------------------------------------------------------------------

@@ -12,8 +12,15 @@
     <!-- Gerado por tools\gerar-icone.ps1 a partir de assets\icone\*.svg -->
     <ApplicationIcon>miniflix.ico</ApplicationIcon>
     <Version>0.1.0</Version>
-    <!-- Portátil: sem single-file para não extrair DLLs nativas em %TEMP% -->
-    <PublishSingleFile>false</PublishSingleFile>
+    <!-- Arquivo único: o .NET (≈230 DLLs) vai dentro do MiniFlix.exe, que fica fácil de achar.
+         IncludeNativeLibrariesForSelfExtract=false: as poucas DLLs nativas ficam AO LADO do .exe
+         em vez de serem extraídas para %TEMP% (o app não pode deixar rastros no PC). -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <!-- Símbolos de depuração dentro do .exe: stack traces com linha, sem .pdb solto. -->
+    <DebugType>embedded</DebugType>
+    <!-- Não publica os .xml de documentação dos pacotes NuGet (inúteis para o usuário final). -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
     <!-- O pacote WebView2 também referencia a DLL de WPF; o conflito de WindowsBase é inofensivo em WinForms. -->
     <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>

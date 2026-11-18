@@ -1,4 +1,4 @@
-# MiniFlix — Plano do Projeto
+﻿# MiniFlix — Plano do Projeto
 
 Aplicação desktop **100% portátil para Windows**: um catálogo e player de vídeos offline (um "mini streaming" local). Roda direto de qualquer pasta ou pendrive, sem instalação, sem configuração prévia e sem deixar rastros no PC hospedeiro.
 
@@ -21,7 +21,7 @@ Aplicação desktop **100% portátil para Windows**: um catálogo e player de v�
 - **Caminhos sempre relativos** a `AppContext.BaseDirectory`.
 - **Nada no Registro nem em `%AppData%`/`%TEMP%`.**
   - A pasta de dados do WebView2 (`userDataFolder`) aponta para `/data/webview`.
-  - Publicar **em pasta** (sem `PublishSingleFile`), para que as DLLs nativas não sejam extraídas em `%TEMP%`.
+  - Publicar como **arquivo único** (`PublishSingleFile`) com `IncludeNativeLibrariesForSelfExtract=false`: o .NET vai dentro do `MiniFlix.exe` e nada é extraído em `%TEMP%`. O `WebView2Loader.dll` fica em `/bin` (via `SetLoaderDllFolderPath`), então a raiz tem só o `.exe` e o `README.txt`.
 - **O WebView2 Runtime vai junto com o app.** O Windows 10 nem sempre tem o runtime instalado. Usar `CoreWebView2Environment.CreateAsync(browserExecutableFolder: "bin/webview2", userDataFolder: "data/webview")`.
   - Se `/bin/webview2` não existir, tentar o runtime instalado no sistema como fallback e mostrar um aviso claro se nenhum for encontrado.
 
@@ -236,8 +236,8 @@ Aplicação desktop **100% portátil para Windows**: um catálogo e player de v�
 # CSS (desenvolvimento)
 .\tools\tailwindcss.exe -i .\src\ui\input.css -o .\ui\tailwind.css --minify
 
-# Publicação portátil (em pasta, sem single-file)
-dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o .\dist\MiniFlix
+# Publicação portátil (arquivo único; opções no .csproj) — ou simplesmente .\build.ps1
+dotnet publish -c Release -r win-x64 --self-contained true -o .\dist\MiniFlix
 ```
 
 - Binários de terceiros ficam em `vendor\bin` (fora do código-fonte). Um script `build.ps1` copia `/ui` e `vendor\bin` → `/bin` (incluindo o WebView2 Fixed Runtime) para `dist\MiniFlix` e gera o `README.txt`.

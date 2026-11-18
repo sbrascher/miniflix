@@ -262,6 +262,11 @@ internal sealed class MainForm : Form
 
     private async Task InitWebViewAsync()
     {
+        // 0) O build move o WebView2Loader.dll para /bin (a raiz fica só com o MiniFlix.exe).
+        //    Precisa ser definido antes de qualquer outra chamada ao WebView2.
+        if (File.Exists(Path.Combine(AppPaths.Bin, "WebView2Loader.dll")))
+            CoreWebView2Environment.SetLoaderDllFolderPath(AppPaths.Bin);
+
         // 1) Runtime: Fixed Version em /bin/webview2, senão o instalado no sistema.
         string? browserFolder = File.Exists(Path.Combine(AppPaths.WebView2Fixed, "msedgewebview2.exe"))
             ? AppPaths.WebView2Fixed

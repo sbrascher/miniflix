@@ -43,8 +43,26 @@ function Obter-Versao {
 }
 
 function Publicar($destino) {
+  # Remove restos de publicações anteriores na raiz (ex.: as ~230 DLLs de antes do arquivo
+  # único) sem tocar em bin\, data\ e videos\, que guardam ferramentas e dados do usuário.
+  if (Test-Path $destino) {
+    Get-ChildItem $destino -File | Remove-Item -Force
+    foreach ($d in 'pt-BR', 'runtimes', 'ui') {
+      $p = Join-Path $destino $d
+      if (Test-Path $p) { Remove-Item $p -Recurse -Force }
+    }
+  }
+
   dotnet publish $csproj -c Release -r win-x64 --self-contained true -o $destino
   if ($LASTEXITCODE -ne 0) { throw 'dotnet publish falhou' }
+
+  # A raiz fica só com o MiniFlix.exe: o loader nativo do WebView2 vai para bin\
+  # (o app aponta para lá com CoreWebView2Environment.SetLoaderDllFolderPath).
+  $loader = Join-Path $destino 'WebView2Loader.dll'
+  if (Test-Path $loader) {
+    New-Item -ItemType Directory -Force (Join-Path $destino 'bin') | Out-Null
+    Move-Item $loader (Join-Path $destino 'bin\WebView2Loader.dll') -Force
+  }
 }
 
 function Copiar-Pasta($origem, $destino, [string[]] $excluirPastas = @()) {
@@ -119,8 +137,14 @@ if ($Pacote) {
       $nomes = $arq.Entries | ForEach-Object { $_.FullName.Replace('\', '/') }
       $proibidos = $nomes | Where-Object { $_ -match '^MiniFlix/(data|videos)/' -or $_ -match '\.mp4$' }
       if ($proibidos) { throw "O pacote contém arquivos que não deveriam estar lá: $($proibidos | Select-Object -First 3)" }
-      foreach ($esperado in 'MiniFlix/MiniFlix.exe', 'MiniFlix/README.txt', 'MiniFlix/ui/index.html', 'MiniFlix/bin/yt-dlp.exe') {
+      foreach ($esperado in 'MiniFlix/MiniFlix.exe', 'MiniFlix/README.txt', 'MiniFlix/ui/index.html',
+                            'MiniFlix/bin/yt-dlp.exe', 'MiniFlix/bin/WebView2Loader.dll') {
         if ($nomes -notcontains $esperado) { throw "Falta $esperado em $($v.Nome)" }
+      }
+      # Na raiz, só o executável e o manual: é o que a pessoa vê ao abrir a pasta.
+      $soltos = $nomes | Where-Object { $_ -match '^MiniFlix/[^/]+$' } | Sort-Object
+      if (($soltos -join ',') -ne 'MiniFlix/MiniFlix.exe,MiniFlix/README.txt') {
+        throw "Arquivos inesperados na raiz de $($v.Nome): $($soltos -join ', ')"
       }
       $temWebView2 = [bool]($nomes -contains 'MiniFlix/bin/webview2/msedgewebview2.exe')
       if ($temWebView2 -eq $v.SemWebView2) { throw "WebView2 incorreto em $($v.Nome)" }

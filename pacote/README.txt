@@ -67,6 +67,8 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     começados aparecem na fileira "Continuar assistindo" e voltam
     exatamente do ponto em que você parou. Vídeos vistos até o fim
     ganham o selo "Assistido".
+    Para tirar um vídeo dessa fileira, passe o mouse sobre ele e clique
+    no "X" do canto da capa (dá para desfazer logo em seguida).
 
   ATALHOS DO TECLADO (dentro do player)
     Espaço ou K ........ reproduzir / pausar

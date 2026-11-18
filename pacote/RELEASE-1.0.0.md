@@ -24,7 +24,7 @@ O arquivo `README.txt` dentro da pasta tem o guia completo: atalhos, dicas para 
 
 **Catálogo**
 - Vídeos organizados por categoria, com capa, duração e busca instantânea (tecla `/`).
-- Fileira **"Continuar assistindo"**: cada vídeo volta exatamente de onde você parou.
+- Fileira **"Continuar assistindo"**: cada vídeo volta exatamente de onde você parou. Dá para tirar um vídeo da fileira pelo "×" no card, com opção de desfazer.
 - Selo **"Assistido"** nos vídeos vistos até o fim.
 - Tema **claro e escuro**, com visual em relevo, de aparência "emborrachada".
 

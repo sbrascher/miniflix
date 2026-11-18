@@ -54,6 +54,21 @@ export async function reiniciarProgresso(slug) {
   await bridge.call('progresso.reiniciar', { slug }).catch(() => {});
 }
 
+/**
+ * Tira o vídeo de "Continuar assistindo" (zera a posição; o selo de assistido continua).
+ * Devolve o estado anterior, para permitir "Desfazer".
+ */
+export async function removerDeContinuar(slug) {
+  const anterior = mapa[slug] ? { ...mapa[slug] } : null;
+  await reiniciarProgresso(slug);
+  return anterior;
+}
+
+/** Desfaz removerDeContinuar: volta à posição anterior. */
+export async function restaurarProgresso(slug, anterior) {
+  if (anterior) await registrarProgresso(slug, anterior.posicao, anterior.duracao);
+}
+
 export function esquecerProgresso(slug) {
   delete mapa[slug];
 }

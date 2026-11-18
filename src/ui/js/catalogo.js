@@ -1,6 +1,7 @@
 import { h, normalizar, fmtDuracao, matiz, plural } from './util.js';
 import { icone } from './icones.js';
-import { obterProgresso, emAndamento, fracao, listaContinuar } from './progresso.js';
+import { obterProgresso, emAndamento, fracao, listaContinuar, removerDeContinuar, restaurarProgresso } from './progresso.js';
+import { toast } from './componentes.js';
 
 /** Filtra por categoria e por todos os termos da busca (sem acento/caixa) no título. */
 export function filtrar(videos, { busca = '', categoria = '' }) {
@@ -55,12 +56,35 @@ const grade = (filhos) => h('div', {
   class: 'grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
 }, filhos);
 
-function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard } = {}) {
+function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard } = {}) {
   return h('section', { class: 'mb-14', 'aria-labelledby': id },
     h('h2', { id, class: 'mb-5 flex items-center gap-3 font-display text-xl font-bold' },
       nomeIcone ? h('span', { class: 'flex text-destaque' }, icone(nomeIcone, 24)) : null,
       titulo, h('span', { class: 'chip font-medium text-suave' }, plural(videos.length, 'vídeo', 'vídeos'))),
-    grade(videos.map((v) => cardVideo(v, opcoesCard))));
+    grade(videos.map((v, i) => (montarCard ? montarCard(v, i) : cardVideo(v, opcoesCard)))));
+}
+
+/**
+ * Card da fileira "Continuar assistindo": o card normal + botão para tirá-lo da fileira.
+ * O botão é irmão do link (não filho): botão dentro de <a> é HTML inválido.
+ */
+function cardContinuar(v, indice, aoAlterar) {
+  const remover = h('button', {
+    type: 'button', class: 'card-remover', title: 'Remover de Continuar assistindo',
+    'aria-label': `Remover “${v.titulo}” de Continuar assistindo`,
+    onclick: async () => {
+      const anterior = await removerDeContinuar(v.slug);
+      aoAlterar?.({ focarIndice: indice });
+      toast('Removido de Continuar assistindo.', 'ok', {
+        rotulo: 'Desfazer',
+        aoClicar: async () => {
+          await restaurarProgresso(v.slug, anterior);
+          aoAlterar?.({});
+        },
+      });
+    },
+  }, icone('close', 18));
+  return h('div', { class: 'card-continuar' }, cardVideo(v, { mostrarRestante: true }), remover);
 }
 
 function estadoVazio(icon, titulo, texto, acao) {
@@ -71,8 +95,12 @@ function estadoVazio(icon, titulo, texto, acao) {
     acao ? h('div', { class: 'mt-6' }, acao) : null);
 }
 
-/** Renderiza a tela de catálogo em `raiz`. */
-export function renderCatalogo(raiz, { videos, categorias, busca, categoria }) {
+/**
+ * Renderiza a tela de catálogo em `raiz`.
+ * aoAlterarProgresso({ focarIndice }): chamado quando um vídeo sai (ou volta) da fileira
+ * "Continuar assistindo" — quem chama redesenha a tela.
+ */
+export function renderCatalogo(raiz, { videos, categorias, busca, categoria }, { aoAlterarProgresso } = {}) {
   const conteudo = h('div', { class: 'mx-auto max-w-[1600px] px-4 pb-16 pt-9 sm:px-6' });
 
   if (videos.length === 0) {
@@ -96,8 +124,10 @@ export function renderCatalogo(raiz, { videos, categorias, busca, categoria }) {
     // "Continuar assistindo" só na visão geral (sem filtro de categoria).
     const continuar = categoria ? [] : listaContinuar(videos);
     if (continuar.length) {
-      conteudo.append(secao('Continuar assistindo', continuar, 'secao-continuar',
-        { icone: 'history', opcoesCard: { mostrarRestante: true } }));
+      conteudo.append(secao('Continuar assistindo', continuar, 'secao-continuar', {
+        icone: 'history',
+        montarCard: (v, i) => cardContinuar(v, i, aoAlterarProgresso),
+      }));
     }
     categorias
       .filter((c) => !categoria || c === categoria)
@@ -108,4 +138,14 @@ export function renderCatalogo(raiz, { videos, categorias, busca, categoria }) {
   }
 
   raiz.replaceChildren(conteudo);
+}
+
+/**
+ * Depois de remover um card da fileira, o foco iria para o <body> (o botão sumiu).
+ * Leva o foco ao card que ocupou a mesma posição, ou ao primeiro card da página.
+ */
+export function focarAposRemocao(raiz, indice) {
+  const cards = raiz.querySelectorAll('section[aria-labelledby=secao-continuar] .card-video');
+  const alvo = cards[Math.min(indice, cards.length - 1)] ?? raiz.querySelector('.card-video');
+  alvo?.focus({ preventScroll: true });
 }

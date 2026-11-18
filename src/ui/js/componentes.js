@@ -50,8 +50,11 @@ export function confirmar({ titulo, mensagem, textoConfirmar = 'Confirmar', peri
 }
 
 let pilhaToasts;
-/** Aviso rápido no canto da tela. tipo: 'ok' | 'erro'. */
-export function toast(mensagem, tipo = 'ok') {
+/**
+ * Aviso rápido no canto da tela. tipo: 'ok' | 'erro'.
+ * acao (opcional): { rotulo, aoClicar } — ex.: "Desfazer". Com ação, o aviso fica mais tempo.
+ */
+export function toast(mensagem, tipo = 'ok', acao = null) {
   if (!pilhaToasts) {
     pilhaToasts = h('div', { class: 'pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3' });
     document.body.append(pilhaToasts);
@@ -60,7 +63,26 @@ export function toast(mensagem, tipo = 'ok') {
   // Erros são anunciados imediatamente por leitores de tela; confirmações, com educação.
   const el = h('div', { class: 'toast pointer-events-auto', role: erro ? 'alert' : 'status' },
     h('span', { class: `flex ${erro ? 'text-perigo' : 'text-sucesso'}` }, icone(erro ? 'error' : 'check_circle', 22, true)),
-    mensagem);
+    h('span', {}, mensagem));
+
+  let timer;
+  const sumir = () => {
+    clearTimeout(timer);
+    el.classList.add('opacity-0', 'translate-y-2');
+    setTimeout(() => el.remove(), 300);
+  };
+  const agendar = () => { timer = setTimeout(sumir, acao ? 7000 : erro ? 6000 : 3000); };
+
+  if (acao) {
+    el.append(h('button', {
+      type: 'button', class: 'toast-acao',
+      onclick: () => { sumir(); acao.aoClicar(); },
+    }, acao.rotulo));
+    // Quem está prestes a clicar em "Desfazer" não pode ver o aviso sumir na sua frente.
+    el.addEventListener('mouseenter', () => clearTimeout(timer));
+    el.addEventListener('mouseleave', agendar);
+    el.addEventListener('focusin', () => clearTimeout(timer));
+  }
   pilhaToasts.append(el);
-  setTimeout(() => { el.classList.add('opacity-0', 'translate-y-2'); setTimeout(() => el.remove(), 300); }, erro ? 6000 : 3000);
+  agendar();
 }

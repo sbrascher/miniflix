@@ -1,7 +1,7 @@
 import { bridge } from './bridge.js';
 import { h } from './util.js';
 import { icone } from './icones.js';
-import { renderCatalogo } from './catalogo.js';
+import { renderCatalogo, focarAposRemocao } from './catalogo.js';
 import { renderPlayer } from './player.js';
 import { renderAdmin } from './admin.js';
 import { atualizarFila } from './fila.js';
@@ -52,14 +52,25 @@ async function carregarCatalogo() {
     ...estado.categorias.map((c) => h('option', { value: c, selected: c === estado.categoria }, c)));
 }
 
+/** Desenha o catálogo; ao tirar/devolver um vídeo de "Continuar assistindo", redesenha mantendo a rolagem. */
+function desenharCatalogo() {
+  renderCatalogo(raiz, estado, {
+    aoAlterarProgresso: ({ focarIndice } = {}) => {
+      const rolagem = window.scrollY;
+      desenharCatalogo();
+      window.scrollTo(0, rolagem);
+      if (focarIndice !== undefined) focarAposRemocao(raiz, focarIndice);
+    },
+  });
+}
 function atualizarCatalogoNaTela() {
-  if (rotaAtual().nome === 'catalogo') renderCatalogo(raiz, estado);
+  if (rotaAtual().nome === 'catalogo') desenharCatalogo();
 }
 
 /** Depois de editar/excluir/recarregar: redesenha a tela atual com os dados novos. */
 function atualizarTelaAtual() {
   const rota = rotaAtual().nome;
-  if (rota === 'catalogo') renderCatalogo(raiz, estado);
+  if (rota === 'catalogo') desenharCatalogo();
   else if (rota === 'admin') renderAdmin(raiz, estado);
 }
 
@@ -155,7 +166,7 @@ function navegar() {
     window.scrollTo(0, 0);
   } else {
     document.title = 'MiniFlix';
-    renderCatalogo(raiz, estado);
+    desenharCatalogo();
     window.scrollTo(0, anterior === 'player' ? rolagemCatalogo : 0);
   }
 }

@@ -546,6 +546,39 @@
 
   .card-video-restante { margin: 0.25rem 0.3rem 0; font-size: 0.75rem; color: var(--suave); }
 
+  /* Card de "Continuar assistindo": o link e o botão "remover" são irmãos (botão dentro de
+     link é HTML inválido). A elevação do hover passa a valer para o conjunto, senão o card
+     "cairia" ao levar o mouse até o botão. */
+  .card-continuar { position: relative; }
+  .card-continuar:hover > .card-video,
+  .card-continuar:focus-within > .card-video { transform: translateY(-4px); }
+  .card-continuar:hover > .card-video::after,
+  .card-continuar:focus-within > .card-video::after { opacity: 1; }
+
+  .card-remover {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    color: #fff;
+    background: rgb(15 16 20 / 0.72);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.1);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(0);
+    transition: opacity var(--rapido), transform var(--medio) var(--ease), background-color var(--rapido);
+  }
+  .card-continuar:hover > .card-remover,
+  .card-continuar:focus-within > .card-remover { opacity: 1; transform: translateY(-4px); }
+  .card-remover:hover { background: var(--perigo); }
+  .card-remover:focus-visible { opacity: 1; }
+
   /* Coluna do player: largura limitada pela altura da janela (16:9) para o título
      ficar visível sem rolar, e alinhado com o vídeo. */
   .coluna-player {
@@ -701,6 +734,19 @@
     transition: opacity 300ms, transform 300ms var(--ease);
   }
 
+  .toast-acao {
+    margin-left: 0.25rem;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    font-weight: 700;
+    color: var(--destaque);
+    background: var(--superficie);
+    box-shadow: var(--relevo-1);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toast-acao:active { box-shadow: var(--afundar-leve); }
+
   /* Indicador pulsante (fila trabalhando). */
   .indicador {
     position: absolute;
@@ -723,7 +769,7 @@
 @media (forced-colors: active) {
   .painel, .bandeja, .pastilha, .btn, .btn-primario, .btn-perigo, .btn-icone-elevado,
   .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho,
-  .tecla, .osd, .aviso-retomar {
+  .tecla, .osd, .aviso-retomar, .card-remover, .toast-acao {
     border: 1px solid CanvasText;
   }
   .trilho-preenchimento { background: Highlight; }
@@ -738,6 +784,8 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  .card-video:hover, .card-video:focus-visible { transform: none; }
+  .card-video:hover, .card-video:focus-visible,
+  .card-continuar:hover > .card-video, .card-continuar:focus-within > .card-video,
+  .card-continuar:hover > .card-remover, .card-continuar:focus-within > .card-remover { transform: none; }
   .card-video:hover .card-video-capa img { transform: none; }
 }

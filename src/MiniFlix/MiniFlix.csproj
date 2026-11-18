@@ -23,7 +23,7 @@
 
   <!-- Frontend (src/ui) copiado para a pasta /ui ao lado do .exe -->
   <ItemGroup>
-    <Content Include="..\ui\**\*" Link="ui\%(RecursiveDir)%(Filename)%(Extension)"
+    <Content Include="..\ui\**\*" Exclude="..\ui\css\input.css" Link="ui\%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

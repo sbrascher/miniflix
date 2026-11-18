@@ -1,0 +1,6 @@
+material-symbols-rounded.woff2
+  Material Symbols Rounded — Google
+  Licença: Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0)
+  Origem: https://fonts.google.com/icons
+  Eixos incluídos: FILL 0..1, wght 300..600, opsz 20..48, GRAD 0 (todos os ícones).
+  Baixado uma vez e servido localmente para o app funcionar offline.

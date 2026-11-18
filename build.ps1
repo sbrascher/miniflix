@@ -1,13 +1,37 @@
-<#
+﻿<#
   Gera a pasta portátil em dist\MiniFlix (pronta para copiar para um pendrive).
 
-  Uso:  .\build.ps1                 # publish Release
-        .\build.ps1 -VideoTeste     # + gera um vídeo de teste grande em dist\MiniFlix\videos
+  Uso:  .\build.ps1                  # compila o CSS (se houver tools\tailwindcss.exe) + publish Release
+        .\build.ps1 -SoCss           # só recompila src\ui\css\app.css
+        .\build.ps1 -VideoTeste      # + gera um vídeo de teste grande em dist\MiniFlix\videos
+        .\build.ps1 -AcervoTeste     # + gera um acervo de exemplo (vídeos curtos com capa e metadados)
 #>
-param([switch] $VideoTeste)
+param([switch] $SoCss, [switch] $VideoTeste, [switch] $AcervoTeste)
 $ErrorActionPreference = 'Stop'
 $raiz = $PSScriptRoot
 $dist = Join-Path $raiz 'dist\MiniFlix'
+
+# ---- CSS (Tailwind standalone, sem Node) ----
+$tailwind = Join-Path $raiz 'tools\tailwindcss.exe'
+if (Test-Path $tailwind) {
+  Write-Host 'Compilando Tailwind ...'
+  Push-Location (Join-Path $raiz 'src\ui')
+  # Sem redirecionar stderr: no Windows PowerShell 5.1, "2>&1" + ErrorActionPreference=Stop
+  # transforma o banner do Tailwind (escrito em stderr) em erro fatal.
+  try { & $tailwind -i css\input.css -o css\app.css --minify }
+  finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { throw 'Tailwind falhou' }
+} elseif ($SoCss) {
+  throw 'tools\tailwindcss.exe não encontrado. Rode .\tools\baixar-tailwind.ps1'
+} else {
+  Write-Warning 'tools\tailwindcss.exe não encontrado: usando o src\ui\css\app.css já versionado.'
+}
+if ($SoCss) { return }
+
+# ---- Publish ----
+$exeDist = Join-Path $dist 'MiniFlix.exe'
+$aberto = Get-Process MiniFlix -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exeDist }
+if ($aberto) { throw "O MiniFlix está aberto a partir de $dist. Feche-o e rode o build novamente." }
 
 dotnet publish (Join-Path $raiz 'src\MiniFlix\MiniFlix.csproj') -c Release -r win-x64 --self-contained true -o $dist
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish falhou' }
@@ -24,7 +48,8 @@ if (Test-Path $vendorBin) {
 
 foreach ($d in 'videos', 'data') { New-Item -ItemType Directory -Force (Join-Path $dist $d) | Out-Null }
 
-if ($VideoTeste) { & (Join-Path $raiz 'tools\gerar-video-teste.ps1') -Raiz $dist }
+if ($VideoTeste)  { & (Join-Path $raiz 'tools\gerar-video-teste.ps1') -Raiz $dist }
+if ($AcervoTeste) { & (Join-Path $raiz 'tools\gerar-acervo-teste.ps1') -Raiz $dist }
 
 $tam = (Get-ChildItem $dist -Recurse -File -Exclude *.mp4 | Measure-Object Length -Sum).Sum
 Write-Host ("`nPronto: {0}  ({1:N0} MB sem vídeos)" -f $dist, ($tam / 1MB))

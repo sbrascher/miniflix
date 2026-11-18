@@ -1,52 +1,47 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="escuro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MiniFlix — Protótipo</title>
-  <link rel="stylesheet" href="prototipo.css">
+  <title>MiniFlix</title>
+  <script>
+    // O C# injeta window.__miniflix.tema antes da página carregar: evita "piscar" o tema errado.
+    document.documentElement.dataset.theme = (window.__miniflix && window.__miniflix.tema) || 'escuro';
+  </script>
+  <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
-  <header>
-    <h1>MiniFlix <span class="tag">protótipo de riscos</span></h1>
+<body class="min-h-screen">
+  <a href="#app" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 btn">Pular para o conteúdo</a>
+
+  <header class="sticky top-0 z-30 border-b border-borda bg-fundo/85 backdrop-blur-md">
+    <div class="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-4 sm:px-6">
+      <a href="#/" class="mr-2 shrink-0 font-display text-2xl font-extrabold tracking-tight" aria-label="MiniFlix — início">
+        Mini<span class="text-destaque">Flix</span>
+      </a>
+
+      <div id="filtros" class="flex min-w-0 flex-1 items-center gap-2">
+        <label class="relative min-w-0 flex-1 sm:max-w-md">
+          <span class="sr-only">Buscar por título</span>
+          <span id="icone-busca" class="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 text-suave"></span>
+          <input id="busca" type="search" class="campo w-full pl-10" placeholder="Buscar por título…  ( / )" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="shrink-0">
+          <span class="sr-only">Filtrar por categoria</span>
+          <select id="categoria" class="campo max-w-48 pr-8">
+            <option value="">Todas as categorias</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="ml-auto flex shrink-0 items-center gap-1">
+        <button id="btn-tema" type="button" class="btn-icone"></button>
+        <a id="btn-admin" href="#/admin" class="btn-icone" aria-label="Área administrativa" title="Área administrativa"></a>
+      </div>
+    </div>
   </header>
 
-  <main>
-    <section class="card">
-      <h2>1. Ambiente</h2>
-      <dl id="info"><dt>Carregando…</dt></dl>
-      <p id="aviso-fs" class="aviso" hidden></p>
-    </section>
+  <main id="app" tabindex="-1" class="focus:outline-none"></main>
 
-    <section class="card">
-      <h2>2. Ponte JS ↔ C#</h2>
-      <p>Ida e volta (média de 20 pings): <strong id="ping">—</strong></p>
-    </section>
-
-    <section class="card wide">
-      <h2>3. Reprodução e seek</h2>
-      <div class="linha">
-        <label for="lista">Vídeo:</label>
-        <select id="lista"></select>
-        <button id="btn-carregar">Carregar</button>
-      </div>
-      <p id="sem-videos" class="aviso" hidden>
-        Nenhum .mp4 em <code>/videos</code>. Rode <code>tools\gerar-video-teste.ps1</code> ou copie um vídeo para
-        <code>videos\teste\</code>.
-      </p>
-      <video id="player" controls preload="metadata"></video>
-      <div class="linha">
-        <button id="btn-range">Testar Range (206)</button>
-        <button id="btn-seek">Testar seek automático</button>
-        <button id="btn-liberar">Testar liberação do arquivo</button>
-      </div>
-      <table id="resultados">
-        <thead><tr><th>Teste</th><th>Resultado</th><th>Detalhe</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

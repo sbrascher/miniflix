@@ -1,27 +1,4 @@
-'use strict';
-
-// ---------- Ponte JS <-> C# ----------
-const bridge = (() => {
-  const pendentes = new Map();
-  let seq = 0;
-  window.chrome?.webview?.addEventListener('message', (ev) => {
-    const msg = ev.data;
-    const p = msg?.idRequisicao && pendentes.get(msg.idRequisicao);
-    if (!p) return;
-    pendentes.delete(msg.idRequisicao);
-    msg.erro ? p.reject(new Error(msg.erro)) : p.resolve(msg.dados);
-  });
-  return {
-    call(tipo, dados = {}) {
-      if (!window.chrome?.webview) return Promise.reject(new Error('Fora do WebView2'));
-      const idRequisicao = String(++seq);
-      return new Promise((resolve, reject) => {
-        pendentes.set(idRequisicao, { resolve, reject });
-        window.chrome.webview.postMessage({ tipo, idRequisicao, dados });
-      });
-    }
-  };
-})();
+import { bridge } from './bridge.js';
 
 // ---------- Utilidades ----------
 const $ = (s) => document.querySelector(s);

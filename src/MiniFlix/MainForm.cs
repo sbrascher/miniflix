@@ -3,27 +3,119 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using MiniFlix.Models;
+using MiniFlix.Services;
 
 namespace MiniFlix;
 
 internal sealed class MainForm : Form
 {
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
+    private readonly Bridge _bridge;
+    private readonly CatalogService _catalogo;
+    private readonly SettingsService _config;
+    private readonly string[] _args = Environment.GetCommandLineArgs();
     private string _runtimeVersion = "?";
     private string _runtimeSource = "?";
 
-    private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
-
     public MainForm()
     {
-        Text = "MiniFlix — Protótipo";
-        Width = 1280;
-        Height = 820;
+        Text = "MiniFlix";
+        Width = 1360;
+        Height = 860;
+        MinimumSize = new Size(720, 480);
         StartPosition = FormStartPosition.CenterScreen;
-        BackColor = Color.FromArgb(18, 18, 20);
+
+        _config = new SettingsService(Path.Combine(AppPaths.Data, "settings.json"));
+        BackColor = _config.Atual.Tema == "claro" ? Color.FromArgb(250, 250, 250) : Color.FromArgb(12, 12, 14);
+
+        _bridge = new Bridge(json => RunOnUi(() => _webView.CoreWebView2?.PostWebMessageAsJson(json)));
+        _catalogo = new CatalogService(AppPaths.Videos, Path.Combine(AppPaths.Data, "catalog-cache.json"), AppPaths.ToUrl);
+        _catalogo.Alterado += () => _bridge.Emitir("catalogo.atualizado");
+        RegistrarComandos();
+
         Controls.Add(_webView);
         Load += async (_, _) => await InitWebViewAsync();
     }
+
+    private void RunOnUi(Action acao)
+    {
+        if (IsDisposed) return;
+        if (InvokeRequired) BeginInvoke(acao); else acao();
+    }
+
+    // ---------- Comandos da ponte ----------
+
+    private void RegistrarComandos()
+    {
+        _bridge.Registrar("ping", _ => new { pong = DateTime.Now.ToString("O") });
+        _bridge.Registrar("sistema.info", _ => SistemaInfo());
+
+        _bridge.Registrar("config.obter", _ => _config.Atual);
+        _bridge.Registrar("config.salvar", d =>
+        {
+            var novo = d.Deserialize<Settings>(JsonStore.Opcoes) ?? throw new ArgumentException("Configuração vazia.");
+            var salvo = _config.Salvar(novo);
+            RunOnUi(() => BackColor = salvo.Tema == "claro" ? Color.FromArgb(250, 250, 250) : Color.FromArgb(12, 12, 14));
+            return salvo;
+        });
+
+        _bridge.Registrar("catalogo.listar", _ => new
+        {
+            videos = _catalogo.Itens.Select(ParaUi),
+            categorias = _catalogo.Categorias(),
+        });
+        _bridge.Registrar("catalogo.recarregar", async _ =>
+        {
+            await Task.Run(_catalogo.Varrer);
+            return (object?)null;
+        });
+        _bridge.Registrar("video.editar", async d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            string? Campo(string n) => d?[n]?.GetValue<string>();
+            var item = await Task.Run(() => _catalogo.Editar(slug, Campo("titulo"), Campo("categoria"), Campo("descricao")));
+            return ParaUi(item);
+        });
+        _bridge.Registrar("video.excluir", async d =>
+        {
+            await _catalogo.ExcluirAsync(Bridge.Texto(d, "slug"));
+            return (object?)null;
+        });
+        _bridge.Registrar("video.obter", d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            return _catalogo.Obter(slug) is { } item ? ParaUi(item) : throw new KeyNotFoundException("Vídeo não encontrado.");
+        });
+
+        // Diagnóstico (página ui/diagnostico.html)
+        _bridge.Registrar("teste.listarVideos", _ => ListarVideosTeste());
+        _bridge.Registrar("teste.arquivoTravado", async d => await ArquivoTravadoAsync(Bridge.Texto(d, "caminho")));
+        _bridge.Registrar("teste.relatorio", d =>
+        {
+            var arquivo = Path.Combine(AppPaths.Logs, "autoteste.json");
+            File.WriteAllText(arquivo, d?.ToJsonString(JsonStore.Opcoes) ?? "{}");
+            RunOnUi(Close);
+            return new { arquivo };
+        });
+    }
+
+    private static object ParaUi(VideoItem i) => new
+    {
+        i.Meta.Slug,
+        i.Meta.Titulo,
+        i.Meta.Descricao,
+        i.Meta.Categoria,
+        i.Meta.Origem,
+        i.Meta.DuracaoSegundos,
+        i.Meta.DataPublicacao,
+        i.Meta.DataAdicionado,
+        i.VideoUrl,
+        i.CapaUrl,
+        i.TamanhoBytes,
+    };
+
+    // ---------- WebView2 ----------
 
     private async Task InitWebViewAsync()
     {
@@ -46,11 +138,19 @@ internal sealed class MainForm : Form
             Close();
             return;
         }
+        Log.Info($"Iniciando. WebView2 {_runtimeVersion} ({_runtimeSource}). Raiz: {AppPaths.Root}");
 
-        // 2) Dados do WebView2 ficam dentro da pasta do app (/data/webview), não em %LocalAppData%.
-        var env = await CoreWebView2Environment.CreateAsync(browserFolder, AppPaths.WebViewData);
+        // 2) Dados do WebView2 dentro da pasta do app (/data/webview), não em %LocalAppData%.
+        // App local de mídia: permite autoplay com som ao abrir um vídeo.
+        var opcoes = new CoreWebView2EnvironmentOptions("--autoplay-policy=no-user-gesture-required");
+        var env = await CoreWebView2Environment.CreateAsync(browserFolder, AppPaths.WebViewData, opcoes);
         await _webView.EnsureCoreWebView2Async(env);
         var core = _webView.CoreWebView2;
+        core.Profile.PreferredColorScheme = _config.Atual.Tema == "claro"
+            ? CoreWebView2PreferredColorScheme.Light : CoreWebView2PreferredColorScheme.Dark;
+        // Tema disponível antes do primeiro paint (evita "piscar"). Valor já validado pelo SettingsService.
+        await core.AddScriptToExecuteOnDocumentCreatedAsync(
+            $"window.__miniflix = {JsonSerializer.Serialize(new { tema = _config.Atual.Tema })};");
 
         // 3) Host virtual único -> raiz do app (UI e vídeos na mesma origem, sem CORS).
         core.SetVirtualHostNameToFolderMapping(AppPaths.HostName, AppPaths.Root, CoreWebView2HostResourceAccessKind.DenyCors);
@@ -77,10 +177,35 @@ internal sealed class MainForm : Form
             e.Handled = true;
             OpenExternal(e.Uri);
         };
+        core.WebMessageReceived += async (_, e) => await _bridge.ProcessarAsync(e.WebMessageAsJson);
 
-        core.WebMessageReceived += OnWebMessage;
-        var autoteste = Environment.GetCommandLineArgs().Contains("--autoteste");
-        core.Navigate(AppPaths.Origin + "ui/index.html" + (autoteste ? "?autoteste=1" : ""));
+        _catalogo.Iniciar();
+
+        // Modos de linha de comando:
+        //   --autoteste              roda a página de diagnóstico e grava data/logs/autoteste.json
+        //   --captura <rota> <png>   abre a rota (#/...), salva um PNG da tela e fecha
+        string pagina = "ui/index.html";
+        if (_args.Contains("--autoteste")) pagina = "ui/diagnostico.html?autoteste=1";
+        var iCap = Array.IndexOf(_args, "--captura");
+        if (iCap >= 0 && iCap + 2 < _args.Length)
+        {
+            pagina += _args[iCap + 1];
+            CapturarAoCarregar(core, _args[iCap + 2]);
+        }
+        core.Navigate(AppPaths.Origin + pagina);
+    }
+
+    private void CapturarAoCarregar(CoreWebView2 core, string arquivoPng)
+    {
+        core.NavigationCompleted += async (_, _) =>
+        {
+            await Task.Delay(1500); // tempo para render + carregamento das capas
+            var destino = Path.GetFullPath(arquivoPng);
+            Directory.CreateDirectory(Path.GetDirectoryName(destino)!);
+            await using (var fs = File.Create(destino))
+                await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+            Close();
+        };
     }
 
     private static void OpenExternal(string uri)
@@ -92,42 +217,7 @@ internal sealed class MainForm : Form
         }
     }
 
-    // ---------- Ponte JS <-> C# ----------
-
-    private async void OnWebMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
-    {
-        string tipo = "?";
-        string? id = null;
-        try
-        {
-            var msg = JsonNode.Parse(e.WebMessageAsJson)?.AsObject()
-                      ?? throw new InvalidOperationException("Mensagem vazia.");
-            tipo = msg["tipo"]?.GetValue<string>() ?? throw new InvalidOperationException("Campo 'tipo' ausente.");
-            id = msg["idRequisicao"]?.GetValue<string>();
-            var dados = msg["dados"] as JsonObject;
-
-            object? resultado = tipo switch
-            {
-                "ping" => new { pong = DateTime.Now.ToString("O") },
-                "sistema.info" => SistemaInfo(),
-                "teste.listarVideos" => ListarVideosTeste(),
-                "teste.arquivoTravado" => await ArquivoTravadoAsync(dados?["caminho"]?.GetValue<string>()),
-                "teste.relatorio" => SalvarRelatorio(dados),
-                _ => throw new InvalidOperationException($"Comando desconhecido: {tipo}")
-            };
-            Responder(tipo, id, resultado, null);
-        }
-        catch (Exception ex)
-        {
-            Responder(tipo, id, null, ex.Message);
-        }
-    }
-
-    private void Responder(string tipo, string? id, object? dados, string? erro)
-    {
-        var json = JsonSerializer.Serialize(new { tipo, idRequisicao = id, dados, erro }, JsonOpts);
-        _webView.CoreWebView2?.PostWebMessageAsJson(json);
-    }
+    // ---------- Diagnóstico ----------
 
     private object SistemaInfo()
     {
@@ -147,22 +237,8 @@ internal sealed class MainForm : Form
         };
     }
 
-    private object SalvarRelatorio(JsonObject? dados)
-    {
-        var arquivo = Path.Combine(AppPaths.Logs, "autoteste.json");
-        var opts = new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-        File.WriteAllText(arquivo, dados?.ToJsonString(opts) ?? "{}");
-        BeginInvoke(Close);
-        return new { arquivo };
-    }
-
-    private static object ListarVideosTeste()
-    {
-        return Directory.EnumerateFiles(AppPaths.Videos, "*.mp4", SearchOption.AllDirectories)
+    private static object ListarVideosTeste() =>
+        Directory.EnumerateFiles(AppPaths.Videos, "*.mp4", SearchOption.AllDirectories)
             .Select(p => new FileInfo(p))
             .OrderByDescending(f => f.Length)
             .Select(f => new
@@ -173,15 +249,11 @@ internal sealed class MainForm : Form
                 tamanhoBytes = f.Length
             })
             .ToList();
-    }
 
-    /// <summary>
-    /// Verifica se o arquivo pode ser aberto com acesso exclusivo (ou seja, se poderia ser excluído).
-    /// Tenta algumas vezes porque o navegador pode demorar um pouco para soltar o handle.
-    /// </summary>
-    private static async Task<object> ArquivoTravadoAsync(string? caminho)
+    /// <summary>Verifica se o arquivo pode ser aberto com acesso exclusivo (ou seja, se poderia ser excluído).</summary>
+    private static async Task<object?> ArquivoTravadoAsync(string caminho)
     {
-        var full = AppPaths.ResolveInside(AppPaths.Videos, caminho ?? "")
+        var full = AppPaths.ResolveInside(AppPaths.Videos, caminho)
                    ?? throw new InvalidOperationException("Caminho inválido.");
         if (!File.Exists(full)) throw new FileNotFoundException("Arquivo não encontrado.");
 

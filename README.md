@@ -2,7 +2,7 @@
 
 **Seu catálogo de vídeos offline, no pendrive.** O MiniFlix é um "mini streaming" para Windows que roda direto de qualquer pasta ou pendrive. Você baixa ou importa vídeos uma vez e depois assiste sem internet, em qualquer PC, sem instalar nada e sem deixar rastros no computador.
 
-> 🚧 **Status: em desenvolvimento.** O protótipo técnico (etapa 1) está pronto e validado. As telas de catálogo, player e administração vêm a seguir. Veja o [roadmap](#roadmap).
+> 🚧 **Status: em desenvolvimento.** O protótipo técnico e o catálogo (etapas 1 e 2) estão prontos. Player completo, importação e download vêm a seguir. Veja o [roadmap](#roadmap).
 
 ---
 
@@ -60,9 +60,14 @@ MiniFlix\
 ```powershell
 git clone https://github.com/sbrascher/miniflix.git
 cd miniflix
-.\build.ps1               # gera dist\MiniFlix (portátil, self-contained)
-.\build.ps1 -VideoTeste   # idem + um vídeo de teste de ~1,2 GB (requer ffmpeg no PATH)
+.\tools\baixar-tailwind.ps1  # opcional: Tailwind CLI standalone (só para alterar o CSS)
+.\build.ps1                  # gera dist\MiniFlix (portátil, self-contained)
+.\build.ps1 -AcervoTeste     # idem + 13 vídeos de exemplo com capa e metadados (requer ffmpeg no PATH)
+.\build.ps1 -VideoTeste      # idem + um vídeo de ~1,2 GB para testar seek
+dotnet test MiniFlix.slnx    # testes unitários
 ```
+
+O CSS compilado (`src\ui\css\app.css`) é versionado, então o Tailwind só é necessário para alterar estilos. Não é preciso Node.
 
 Para gerar uma versão totalmente portátil, coloque os binários de terceiros em `vendor\bin\`. A pasta não é versionada; o `build.ps1` a copia para `dist\MiniFlix\bin\`.
 
@@ -75,22 +80,25 @@ Para gerar uma versão totalmente portátil, coloque os binários de terceiros e
 
 Sem `vendor\bin\webview2`, o app usa o WebView2 instalado no Windows.
 
-### Autoteste do protótipo
+### Modos de diagnóstico
 
 ```powershell
 .\dist\MiniFlix\MiniFlix.exe --autoteste
+.\dist\MiniFlix\MiniFlix.exe --captura "#/video/aula-01-introducao" tela.png
 ```
 
-O autoteste verifica a ponte JS ↔ C#, as requisições HTTP Range, o seek em vários pontos do vídeo e a liberação do arquivo após descarregar o player. O relatório fica em `dist\MiniFlix\data\logs\autoteste.json`.
+- `--autoteste` verifica a ponte JS ↔ C#, as requisições HTTP Range, o seek em vários pontos do vídeo e a liberação do arquivo após descarregar o player. O relatório fica em `data\logs\autoteste.json`.
+- `--captura` abre uma tela e salva um PNG. É útil para conferir o visual sem clicar.
+- O log do app fica em `data\logs\miniflix.log`.
 
 ## Roadmap
 
 - [x] **1. Protótipo técnico:** WebView2 portátil, host virtual, seek em vídeo de mais de 1 GB, liberação de arquivo.
-- [ ] 2. Catálogo: leitura de `/videos`, cache e tela inicial.
+- [x] **2. Catálogo:** leitura de `/videos`, cache, busca, filtro por categoria, tema claro/escuro e player básico.
 - [ ] 3. Player: atalhos e "continuar assistindo".
 - [ ] 4. Importação de vídeos locais.
 - [ ] 5. Download do YouTube (yt-dlp) com fila e progresso.
-- [ ] 6. Gerenciamento do acervo.
+- [x] **6. Gerenciamento do acervo:** listagem com filtro, editar título/categoria/descrição e excluir com confirmação.
 - [ ] 7. Tema claro/escuro e polimento visual (Tailwind compilado localmente).
 - [ ] 8. Empacotamento final e teste em PC limpo, a partir do pendrive.
 

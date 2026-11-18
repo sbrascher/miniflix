@@ -1,0 +1,106 @@
+/* Fonte do Tailwind. Compile com:  .\build.ps1 -SoCss   (gera css/app.css, que é versionado) */
+@import "tailwindcss";
+@source "../";
+
+/* Modo escuro controlado por <html data-theme="escuro|claro"> (não pela preferência do sistema). */
+@custom-variant dark (&:where([data-theme=escuro], [data-theme=escuro] *));
+
+:root {
+  --fundo: #fafafa;
+  --superficie: #ffffff;
+  --superficie-2: #f4f4f5;
+  --borda: #e4e4e7;
+  --texto: #18181b;
+  --suave: #52525b;
+  --marca: #c9341b;     /* fundo de botões (contraste ≥ 4.5 com branco) */
+  --destaque: #b52e17;  /* texto/realces sobre o fundo */
+  color-scheme: light;
+}
+[data-theme=escuro] {
+  --fundo: #0c0c0e;
+  --superficie: #17171a;
+  --superficie-2: #202024;
+  --borda: #2a2a30;
+  --texto: #f4f4f5;
+  --suave: #a1a1aa;
+  --marca: #c9341b;
+  --destaque: #ff7a5c;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-borda: var(--borda);
+  --color-texto: var(--texto);
+  --color-suave: var(--suave);
+  --color-marca: var(--marca);
+  --color-destaque: var(--destaque);
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Ícones: Material Symbols Rounded (Google, Apache 2.0), arquivo local — sem CDN.
+   Lista de nomes: https://fonts.google.com/icons  ·  uso: <span class="icone">search</span> */
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: block;
+  src: url(../fonts/material-symbols-rounded.woff2) format('woff2');
+}
+.icone {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  direction: ltr;
+  user-select: none;
+  font-feature-settings: 'liga';
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  -webkit-font-smoothing: antialiased;
+}
+.icone-cheio { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+@keyframes entrar {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@layer base {
+  html { background: var(--fundo); }
+  body { @apply bg-fundo text-texto font-sans antialiased; }
+  :focus-visible { @apply outline-2 outline-offset-2 outline-destaque; }
+  ::selection { background: color-mix(in srgb, var(--marca) 35%, transparent); }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold
+           bg-superficie-2 text-texto ring-1 ring-borda transition
+           hover:ring-destaque/60 hover:text-destaque active:scale-[0.98] disabled:opacity-50;
+  }
+  .btn-icone {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg text-suave transition
+           hover:bg-superficie-2 hover:text-texto active:scale-95;
+  }
+  .btn-primario {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
+           bg-marca text-white shadow-sm transition hover:brightness-110 active:scale-[0.98];
+  }
+  .btn-perigo {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
+           bg-red-600 text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:opacity-50;
+  }
+  .rotulo { @apply mb-1.5 block text-sm font-medium; }
+  .campo {
+    @apply h-10 rounded-lg bg-superficie-2 px-3 text-sm text-texto ring-1 ring-borda transition
+           placeholder:text-suave focus:outline-none focus:ring-2 focus:ring-destaque;
+  }
+}

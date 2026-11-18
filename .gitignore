@@ -16,3 +16,6 @@ vendor/
 data/
 videos/
 *.mp4
+
+# Ferramentas de desenvolvimento baixadas
+tools/*.exe

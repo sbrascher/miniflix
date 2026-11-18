@@ -1,4 +1,4 @@
-<#
+﻿<#
   Gera um MP4 sintético grande (H.264 + AAC, faststart) para testar reprodução e seek.
   O padrão testsrc mostra um contador de tempo na imagem, o que facilita conferir o seek visualmente.
 

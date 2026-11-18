@@ -1,0 +1,265 @@
+using MiniFlix.Models;
+using MiniFlix.Services;
+
+namespace MiniFlix.Tests;
+
+public sealed class CatalogServiceTests : IDisposable
+{
+    private readonly string _raiz = Path.Combine(Path.GetTempPath(), "miniflix-testes", Guid.NewGuid().ToString("N"));
+    private string Videos => Path.Combine(_raiz, "videos");
+    private string Cache => Path.Combine(_raiz, "data", "catalog-cache.json");
+
+    public CatalogServiceTests() => Directory.CreateDirectory(Videos);
+    public void Dispose() { try { Directory.Delete(_raiz, recursive: true); } catch { } }
+
+    private CatalogService Novo() => new(Videos, Cache, p => "url:" + Path.GetFileName(p));
+
+    private void CriarVideo(string slug, string titulo = "T", string categoria = "Cursos",
+        bool mp4 = true, bool capa = true, bool json = true, DateTime? adicionado = null, string? slugNoJson = null)
+    {
+        var dir = Path.Combine(Videos, slug);
+        Directory.CreateDirectory(dir);
+        if (mp4) File.WriteAllBytes(Path.Combine(dir, slug + ".mp4"), new byte[123]);
+        if (capa) File.WriteAllBytes(Path.Combine(dir, slug + ".jpg"), new byte[10]);
+        if (json)
+            JsonStore.Gravar(Path.Combine(dir, slug + ".json"), new VideoMeta
+            {
+                Id = "local:" + slug, Slug = slugNoJson ?? slug, Titulo = titulo, Categoria = categoria,
+                DataAdicionado = adicionado ?? DateTime.Now,
+            });
+    }
+
+    [Fact]
+    public void Varrer_le_videos_validos_e_monta_urls()
+    {
+        CriarVideo("aula-01", "Aula 1");
+        var cat = Novo();
+        Assert.True(cat.Varrer());
+
+        var item = Assert.Single(cat.Itens);
+        Assert.Equal("Aula 1", item.Meta.Titulo);
+        Assert.Equal("url:aula-01.mp4", item.VideoUrl);
+        Assert.Equal("url:aula-01.jpg", item.CapaUrl);
+        Assert.Equal(123, item.TamanhoBytes);
+    }
+
+    [Fact]
+    public void Varrer_ignora_pastas_incompletas_ou_invalidas()
+    {
+        CriarVideo("ok");
+        CriarVideo("sem-mp4", mp4: false);
+        CriarVideo("sem-json", json: false);           // download em andamento
+        CriarVideo("Nome Invalido");                   // fora do padrão de slug
+        var corrompido = Path.Combine(Videos, "corrompido");
+        Directory.CreateDirectory(corrompido);
+        File.WriteAllText(Path.Combine(corrompido, "corrompido.json"), "{ isto não é json");
+        File.WriteAllBytes(Path.Combine(corrompido, "corrompido.mp4"), [1]);
+
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal(["ok"], cat.Itens.Select(i => i.Meta.Slug));
+    }
+
+    [Fact]
+    public void Capa_ausente_resulta_em_url_nula()
+    {
+        CriarVideo("sem-capa", capa: false);
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Null(cat.Itens[0].CapaUrl);
+    }
+
+    [Fact]
+    public void Nome_da_pasta_prevalece_sobre_slug_do_json()
+    {
+        CriarVideo("pasta-certa", slugNoJson: "outro-slug");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal("pasta-certa", cat.Itens[0].Meta.Slug);
+    }
+
+    [Fact]
+    public void Categorias_ordenadas_com_sem_categoria_por_ultimo()
+    {
+        CriarVideo("a", categoria: "Música");
+        CriarVideo("b", categoria: "");
+        CriarVideo("c", categoria: "Documentários");
+        CriarVideo("d", categoria: "cursos");
+        CriarVideo("e", categoria: "Ária");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal(["Ária", "cursos", "Documentários", "Música", CatalogService.SemCategoria], cat.Categorias());
+    }
+
+    [Fact]
+    public void Itens_ordenados_do_mais_recente_para_o_mais_antigo()
+    {
+        CriarVideo("antigo", adicionado: new DateTime(2025, 1, 1));
+        CriarVideo("novo", adicionado: new DateTime(2026, 1, 1));
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal(["novo", "antigo"], cat.Itens.Select(i => i.Meta.Slug));
+    }
+
+    [Fact]
+    public void Segunda_varredura_sem_mudancas_nao_dispara_evento()
+    {
+        CriarVideo("x");
+        var cat = Novo();
+        int eventos = 0;
+        cat.Alterado += () => eventos++;
+        Assert.True(cat.Varrer());
+        Assert.False(cat.Varrer());
+        Assert.Equal(1, eventos);
+    }
+
+    [Fact]
+    public void Varredura_detecta_pasta_apagada_manualmente()
+    {
+        CriarVideo("fica");
+        CriarVideo("sai");
+        var cat = Novo();
+        cat.Varrer();
+        Directory.Delete(Path.Combine(Videos, "sai"), recursive: true);
+        Assert.True(cat.Varrer());
+        Assert.Equal(["fica"], cat.Itens.Select(i => i.Meta.Slug));
+    }
+
+    [Fact]
+    public void Cache_e_gravado_e_reaproveitado_so_para_videos_existentes()
+    {
+        CriarVideo("um");
+        CriarVideo("dois");
+        Novo().Varrer();
+        Assert.True(File.Exists(Cache));
+
+        // Simula um vídeo apagado com o app fechado: o cache ainda o lista, mas não pode aparecer.
+        Directory.Delete(Path.Combine(Videos, "dois"), recursive: true);
+        var cat = Novo();
+        cat.Iniciar();
+        Assert.DoesNotContain(cat.Itens, i => i.Meta.Slug == "dois");
+        Assert.Contains(cat.Itens, i => i.Meta.Slug == "um");
+    }
+
+    // ---------- Edição ----------
+
+    [Fact]
+    public void Editar_altera_json_sem_mudar_slug()
+    {
+        CriarVideo("aula-01", "Antigo", "Cursos");
+        var cat = Novo();
+        cat.Varrer();
+
+        var item = cat.Editar("aula-01", "  Título Novo  ", "Documentários", "Desc\nlinha 2");
+        Assert.Equal("aula-01", item.Meta.Slug);
+        Assert.Equal("Título Novo", item.Meta.Titulo);
+        Assert.Equal("Documentários", item.Meta.Categoria);
+
+        var noDisco = JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "aula-01", "aula-01.json"))!;
+        Assert.Equal("Título Novo", noDisco.Titulo);
+        Assert.Equal("Desc\nlinha 2", noDisco.Descricao);
+        Assert.True(Directory.Exists(Path.Combine(Videos, "aula-01")));
+    }
+
+    [Fact]
+    public void Editar_reaproveita_grafia_de_categoria_existente()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "Outra");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal("Cursos", cat.Editar("b", "B", "cursos", "").Meta.Categoria);
+    }
+
+    [Fact]
+    public void Editar_sem_categoria_grava_vazio()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("a", "A", "Sem categoria", "");
+        Assert.Equal("", JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "a", "a.json"))!.Categoria);
+        Assert.Equal(CatalogService.SemCategoria, cat.Itens[0].Meta.Categoria);
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("")]
+    public void Editar_rejeita_titulo_vazio(string titulo)
+    {
+        CriarVideo("a");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Throws<ArgumentException>(() => cat.Editar("a", titulo, "X", ""));
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("..\\..\\windows")]
+    [InlineData("nao-existe")]
+    public void Editar_e_excluir_rejeitam_slugs_invalidos_ou_inexistentes(string slug)
+    {
+        var cat = Novo();
+        Assert.ThrowsAny<Exception>(() => cat.Editar(slug, "T", "", ""));
+        Assert.ThrowsAnyAsync<Exception>(() => cat.ExcluirAsync(slug)).GetAwaiter().GetResult();
+    }
+
+    // ---------- Exclusão ----------
+
+    [Fact]
+    public async Task Excluir_apaga_pasta_e_dispara_evento()
+    {
+        CriarVideo("fica");
+        CriarVideo("sai");
+        var cat = Novo();
+        cat.Varrer();
+        int eventos = 0;
+        cat.Alterado += () => eventos++;
+
+        await cat.ExcluirAsync("sai");
+        Assert.False(Directory.Exists(Path.Combine(Videos, "sai")));
+        Assert.Equal(["fica"], cat.Itens.Select(i => i.Meta.Slug));
+        Assert.Equal(1, eventos);
+        Assert.Empty(Directory.GetDirectories(Videos, "_excluindo-*"));
+    }
+
+    [Fact]
+    public async Task Excluir_falha_sem_apagar_nada_se_arquivo_estiver_em_uso()
+    {
+        CriarVideo("em-uso");
+        var cat = Novo();
+        cat.Varrer();
+
+        var mp4 = Path.Combine(Videos, "em-uso", "em-uso.mp4");
+        using (new FileStream(mp4, FileMode.Open, FileAccess.Read, FileShare.Read)) // simula o player
+        {
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => cat.ExcluirAsync("em-uso"));
+            Assert.Contains("em uso", ex.Message);
+        }
+        // Tudo intacto: json, mp4 e catálogo.
+        Assert.True(File.Exists(Path.Combine(Videos, "em-uso", "em-uso.json")));
+        Assert.True(File.Exists(mp4));
+        Assert.Single(cat.Itens);
+    }
+
+    [Fact]
+    public void Limpa_restos_de_exclusao_interrompida()
+    {
+        var resto = Path.Combine(Videos, "_excluindo-abc-123");
+        Directory.CreateDirectory(resto);
+        File.WriteAllText(Path.Combine(resto, "x.mp4"), "x");
+        Novo().LimparExclusoesPendentes();
+        Assert.False(Directory.Exists(resto));
+    }
+
+    [Fact]
+    public void JsonStore_gravacao_atomica_nao_deixa_tmp()
+    {
+        var arq = Path.Combine(_raiz, "data", "x.json");
+        JsonStore.Gravar(arq, new Settings { Tema = "claro" });
+        JsonStore.Gravar(arq, new Settings { Tema = "escuro" });
+        Assert.False(File.Exists(arq + ".tmp"));
+        Assert.Equal("escuro", JsonStore.Ler<Settings>(arq)!.Tema);
+        Assert.Contains("\"tema\"", File.ReadAllText(arq)); // camelCase, como no plano
+    }
+}

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="titulo">
+  <!--
+    Versão para 16–32 px do ícone do MiniFlix: mesma composição, sem rebaixo, brilhos finos
+    nem filtros (viram borrão em tamanho pequeno). Botão maior e triângulo mais grosso.
+    Paleta igual a miniflix.svg.
+  -->
+  <title id="titulo">MiniFlix</title>
+  <defs>
+    <linearGradient id="grad-ladrilho" x1="40" y1="16" x2="216" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b404a"/>
+      <stop offset="1" stop-color="#1d2025"/>
+    </linearGradient>
+    <linearGradient id="grad-botao" x1="70" y1="40" x2="186" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f27a42"/>
+      <stop offset="1" stop-color="#b34a19"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="248" height="248" rx="56" fill="url(#grad-ladrilho)"/>
+  <circle cx="128" cy="128" r="96" fill="url(#grad-botao)"/>
+  <polygon points="104,82 104,174 180,128" fill="#fff4ec" stroke="#fff4ec" stroke-width="22" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="titulo desc">
+  <!--
+    Assunto      : ícone do MiniFlix — botão "play" emborrachado encaixado num ladrilho grafite (Soft UI)
+    Tela         : 256×256, foco no botão em (128,128)
+    Luz          : principal de cima/esquerda (135°), luz fria e difusa; sombras para baixo/direita
+    Paleta       : #3a3f49 → #1a1d22 grafite (ladrilho) / #ffa576 → #bf4f1c → #9c3d12 laranja (botão)
+                   #fff4ec creme (triângulo) / #111317 sombra tingida
+    Profundidade : ladrilho → rebaixo (afundado) → botão (elevado) → brilho → triângulo
+    Uso          : 48–256 px. Para 16–32 px use miniflix-pequeno.svg (sem detalhes finos).
+  -->
+  <title id="titulo">MiniFlix</title>
+  <desc id="desc">Botão de play laranja em relevo sobre um ladrilho grafite arredondado.</desc>
+
+  <defs>
+    <linearGradient id="grad-ladrilho" x1="40" y1="16" x2="216" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b404a"/>
+      <stop offset="0.55" stop-color="#272b32"/>
+      <stop offset="1" stop-color="#1a1d22"/>
+    </linearGradient>
+    <!-- Filete de luz só na borda de cima (luz vem de cima) -->
+    <linearGradient id="grad-borda" x1="0" y1="8" x2="0" y2="248" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#eef2ff" stop-opacity="0.16"/>
+      <stop offset="0.35" stop-color="#eef2ff" stop-opacity="0.03"/>
+      <stop offset="1" stop-color="#0c0d10" stop-opacity="0.25"/>
+    </linearGradient>
+    <!-- Rebaixo: invertido em relação à luz (escuro em cima, claro embaixo) = afundado -->
+    <linearGradient id="grad-rebaixo" x1="70" y1="40" x2="186" y2="216" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#14161a"/>
+      <stop offset="1" stop-color="#30343c"/>
+    </linearGradient>
+    <!-- Botão: esfera achatada, luz puxada para cima/esquerda -->
+    <radialGradient id="grad-botao" cx="128" cy="128" r="80" fx="100" fy="92" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffa576"/>
+      <stop offset="0.45" stop-color="#e2692f"/>
+      <stop offset="0.82" stop-color="#bf4f1c"/>
+      <stop offset="1" stop-color="#9c3d12"/>
+    </radialGradient>
+    <linearGradient id="grad-brilho" x1="0" y1="62" x2="0" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff1e6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#fff1e6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="sombra-botao" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="5" dy="7" stdDeviation="7" flood-color="#0c0d10" flood-opacity="0.7"/>
+    </filter>
+  </defs>
+
+  <!-- ladrilho -->
+  <g id="ladrilho">
+    <rect x="8" y="8" width="240" height="240" rx="60" fill="url(#grad-ladrilho)"/>
+    <rect x="9" y="9" width="238" height="238" rx="59" fill="none" stroke="url(#grad-borda)" stroke-width="2"/>
+  </g>
+
+  <!-- rebaixo onde o botão se encaixa -->
+  <g id="rebaixo">
+    <circle cx="128" cy="128" r="92" fill="url(#grad-rebaixo)"/>
+    <circle cx="128" cy="128" r="91" fill="none" stroke="#0c0d10" stroke-opacity="0.35" stroke-width="2"/>
+  </g>
+
+  <!-- botão emborrachado -->
+  <g id="botao">
+    <circle cx="128" cy="128" r="76" fill="url(#grad-botao)" filter="url(#sombra-botao)"/>
+    <!-- borda de luz superior, "borracha" -->
+    <path d="M 62 116 A 66 66 0 0 1 194 116" fill="none" stroke="#ffd2b8" stroke-opacity="0.2" stroke-width="3" stroke-linecap="round"/>
+    <ellipse cx="114" cy="98" rx="54" ry="32" fill="url(#grad-brilho)" transform="rotate(-18 114 98)"/>
+  </g>
+
+  <!-- triângulo de play (deslocado à direita para ficar opticamente centrado) -->
+  <g id="play" stroke-linejoin="round">
+    <polygon points="112,98 112,158 162,128" transform="translate(2.5 3.5)"
+             fill="#6e2709" fill-opacity="0.45" stroke="#6e2709" stroke-opacity="0.45" stroke-width="16"/>
+    <polygon points="112,98 112,158 162,128" fill="#fff4ec" stroke="#fff4ec" stroke-width="16"/>
+  </g>
+</svg>

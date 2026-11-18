@@ -19,3 +19,6 @@ videos/
 
 # Ferramentas de desenvolvimento baixadas
 tools/*.exe
+
+# Prévias geradas pelo validador de SVG
+*_preview.html

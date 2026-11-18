@@ -9,6 +9,8 @@
     <AssemblyName>MiniFlix</AssemblyName>
     <RootNamespace>MiniFlix</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Gerado por tools\gerar-icone.ps1 a partir de assets\icone\*.svg -->
+    <ApplicationIcon>miniflix.ico</ApplicationIcon>
     <Version>0.1.0</Version>
     <!-- Portátil: sem single-file para não extrair DLLs nativas em %TEMP% -->
     <PublishSingleFile>false</PublishSingleFile>

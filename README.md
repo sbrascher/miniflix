@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/icone/miniflix-256.png" width="128" height="128" alt="Ícone do MiniFlix"></p>
+
 # MiniFlix
 
 **Seu catálogo de vídeos offline, no pendrive.** O MiniFlix é um "mini streaming" para Windows que roda direto de qualquer pasta ou pendrive. Você baixa ou importa vídeos uma vez e depois assiste sem internet, em qualquer PC, sem instalar nada e sem deixar rastros no computador.
@@ -65,7 +67,20 @@ cd miniflix
 .\build.ps1 -AcervoTeste     # idem + 13 vídeos de exemplo com capa e metadados (requer ffmpeg no PATH)
 .\build.ps1 -VideoTeste      # idem + um vídeo de ~1,2 GB para testar seek
 dotnet test MiniFlix.slnx    # testes unitários
+.\build.ps1 -Pacote          # ZIPs para distribuição em dist\pacotes (completo e leve) + SHA256SUMS.txt
+.\tools\gerar-icone.ps1      # regenera miniflix.ico (16–256 px) a partir de assets\icone\*.svg
 ```
+
+### Distribuição
+
+O `-Pacote` monta, a partir de uma publicação limpa (sem vídeos, logs nem dados pessoais), dois ZIPs:
+
+| Pacote | Tamanho | Para quem |
+|---|---|---|
+| `MiniFlix-<versão>-win-x64.zip` | ~450 MB | Qualquer Windows 10/11 x64 (inclui o WebView2) |
+| `MiniFlix-<versão>-win-x64-leve.zip` | ~190 MB | Windows 11, ou Windows 10 com o WebView2 instalado |
+
+Antes de compactar, o script confere se todas as dependências estão presentes. Depois de compactar, verifica a estrutura de cada ZIP e se não há dados pessoais dentro. O ideal é publicá-los numa *Release* do GitHub.
 
 O CSS compilado (`src\ui\css\app.css`) é versionado, então o Tailwind só é necessário para alterar estilos. Não é preciso Node.
 

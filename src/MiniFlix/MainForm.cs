@@ -32,6 +32,8 @@ internal sealed class MainForm : Form
         Height = 860;
         MinimumSize = new Size(720, 480);
         StartPosition = FormStartPosition.CenterScreen;
+        // Mesmo ícone do .exe (barra de título e barra de tarefas).
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
         _config = new SettingsService(Path.Combine(AppPaths.Data, "settings.json"));
         BackColor = _config.Atual.Tema == "claro" ? Color.FromArgb(250, 250, 250) : Color.FromArgb(12, 12, 14);

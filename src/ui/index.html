@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MiniFlix</title>
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <script>
     // O C# injeta window.__miniflix.tema antes da página carregar: evita "piscar" o tema errado.
     document.documentElement.dataset.theme = (window.__miniflix && window.__miniflix.tema) || 'escuro';
@@ -15,8 +16,9 @@
 
   <header class="barra-topo sticky top-0 z-30">
     <div class="mx-auto flex h-[4.5rem] max-w-[1600px] items-center gap-4 px-4 sm:px-6">
-      <a href="#/" class="mr-1 shrink-0 font-display text-2xl font-extrabold tracking-tight" aria-label="MiniFlix — início">
-        Mini<span class="text-destaque">Flix</span>
+      <a href="#/" class="mr-1 flex shrink-0 items-center gap-2.5 font-display text-2xl font-extrabold tracking-tight" aria-label="MiniFlix — início">
+        <img src="img/logo.svg" alt="" width="34" height="34" class="drop-shadow-md">
+        <span>Mini<span class="text-destaque">Flix</span></span>
       </a>
 
       <div id="filtros" class="flex min-w-0 flex-1 items-center gap-3">

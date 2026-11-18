@@ -2,6 +2,8 @@
   MiniFlix {{VERSAO}}  -  seu catálogo de vídeos offline, no pendrive
 ==========================================================================
 
+{{VARIANTE}}
+
 O MiniFlix é um "mini streaming" que roda direto desta pasta, sem
 instalar nada. Você adiciona os vídeos uma vez e depois assiste sem
 internet, em qualquer computador com Windows 10 ou 11 (64 bits).
@@ -13,6 +15,10 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
 --------------------------------------------------------------------------
  1. COMO ABRIR
 --------------------------------------------------------------------------
+
+  Se você recebeu um arquivo .zip, primeiro EXTRAIA tudo (botão direito
+  no arquivo > "Extrair Tudo...") para o pendrive ou para uma pasta.
+  O MiniFlix não funciona aberto de dentro do .zip.
 
   Dê dois cliques em  MiniFlix.exe
 

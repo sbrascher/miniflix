@@ -58,7 +58,12 @@ internal sealed class MainForm : Form
         };
 
         Controls.Add(_webView);
-        Load += async (_, _) => await InitWebViewAsync();
+        Load += async (_, _) =>
+        {
+            // Qualquer falha ao iniciar a interface vira uma explicação, nunca um erro técnico solto.
+            try { await InitWebViewAsync(); }
+            catch (Exception ex) { FalhaAoIniciar(ex); }
+        };
     }
 
     private void RunOnUi(Action acao)
@@ -316,10 +321,14 @@ internal sealed class MainForm : Form
         }
         catch (WebView2RuntimeNotFoundException)
         {
+            // Só acontece na versão "leve" (ou se bin\webview2 foi apagado): o Windows não tem o WebView2.
+            Log.Erro("WebView2 não encontrado (nem em bin\\webview2, nem instalado no Windows).");
             MessageBox.Show(this,
-                "Não foi encontrado o componente WebView2.\n\n" +
-                "Coloque o WebView2 Fixed Version Runtime na pasta:\n" + AppPaths.WebView2Fixed,
-                "MiniFlix", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                "Este computador não tem o componente WebView2, que o MiniFlix usa para mostrar a interface.\n\n" +
+                "Você pode:\n" +
+                "  • baixar a versão COMPLETA do MiniFlix, que já inclui o WebView2; ou\n" +
+                "  • instalar o \"Microsoft Edge WebView2 Runtime\" pelo site da Microsoft.",
+                "MiniFlix", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             Close();
             return;
         }
@@ -363,6 +372,7 @@ internal sealed class MainForm : Form
             OpenExternal(e.Uri);
         };
         core.WebMessageReceived += async (_, e) => await _bridge.ProcessarAsync(e.WebMessageAsJson);
+        core.ProcessFailed += (_, e) => AoFalharProcesso(core, e);
 
         // Tela cheia de verdade: sem isso, o elemento só ocupa a área do WebView dentro da janela.
         FormBorderStyle bordaAnterior = FormBorderStyle;
@@ -411,6 +421,60 @@ internal sealed class MainForm : Form
                 await core.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
             Close();
         };
+    }
+
+    private void FalhaAoIniciar(Exception ex)
+    {
+        Log.Erro("Falha ao iniciar a interface (WebView2)", ex);
+        MessageBox.Show(this,
+            "Não foi possível abrir a interface do MiniFlix.\n\n" +
+            "Causas mais comuns:\n" +
+            "  • o arquivo .zip não foi totalmente extraído (extraia tudo de novo);\n" +
+            "  • um antivírus bloqueou arquivos da pasta \"bin\";\n" +
+            "  • a pasta do MiniFlix está incompleta ou foi alterada.\n\n" +
+            $"Detalhe técnico: {ex.Message}\n" +
+            "(registrado em data\\logs\\miniflix.log)",
+            "MiniFlix", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        Close();
+    }
+
+    private DateTime _janelaRecargas = DateTime.MinValue;
+    private int _recargas;
+
+    /// <summary>
+    /// Um processo do WebView2 caiu durante o uso. A parte que desenha a página pode ser
+    /// recarregada (até 3 vezes por minuto, para não entrar em laço); se o navegador inteiro
+    /// caiu, não há como continuar e o app explica e fecha.
+    /// </summary>
+    private void AoFalharProcesso(CoreWebView2 core, CoreWebView2ProcessFailedEventArgs e)
+    {
+        Log.Aviso($"WebView2: processo falhou ({e.ProcessFailedKind}, motivo {e.Reason}, código {e.ExitCode}).");
+        switch (e.ProcessFailedKind)
+        {
+            case CoreWebView2ProcessFailedKind.BrowserProcessExited:
+                MessageBox.Show(this,
+                    "A interface do MiniFlix parou inesperadamente e precisa ser reaberta.\n\n" +
+                    "Abra o MiniFlix novamente. Se acontecer de novo, veja data\\logs\\miniflix.log.",
+                    "MiniFlix", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _saindo = true; // não há interface para perguntar sobre a fila
+                Close();
+                break;
+
+            case CoreWebView2ProcessFailedKind.RenderProcessExited:
+            case CoreWebView2ProcessFailedKind.RenderProcessUnresponsive:
+                if (DateTime.Now - _janelaRecargas > TimeSpan.FromMinutes(1)) { _janelaRecargas = DateTime.Now; _recargas = 0; }
+                if (++_recargas <= 3)
+                {
+                    Log.Info("Recarregando a interface após falha do processo de renderização.");
+                    core.Reload();
+                }
+                else
+                {
+                    FalhaAoIniciar(new InvalidOperationException("A interface falhou várias vezes seguidas."));
+                }
+                break;
+            // Demais processos (GPU, utilitários) o próprio WebView2 reinicia sozinho.
+        }
     }
 
     private static void OpenExternal(string uri)

@@ -22,3 +22,6 @@ tools/*.exe
 
 # Prévias geradas pelo validador de SVG
 *_preview.html
+
+# Pasta pessoal de downloads (fora do projeto)
+yuoutube/

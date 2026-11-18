@@ -141,11 +141,21 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
  7. PROBLEMAS COMUNS
 --------------------------------------------------------------------------
 
-  "Não foi encontrado o componente WebView2"
-    O computador não tem o WebView2 (o motor do Microsoft Edge que o
-    MiniFlix usa) e esta cópia não trouxe o seu próprio. Instale o
-    "Microsoft Edge WebView2 Runtime" pelo site da Microsoft, ou use
-    uma cópia do MiniFlix que tenha a pasta bin\webview2.
+  "O MiniFlix precisa do Windows 10 ou 11 (64 bits)"
+    O computador usa um Windows mais antigo (7, 8, 8.1) ou de 32 bits.
+    Os componentes que o MiniFlix usa não existem mais para esses
+    sistemas, então não há como rodá-lo nesse computador.
+
+  "Este computador não tem o componente WebView2"
+    Acontece com a versão LEVE em computadores sem o WebView2 (o motor
+    do Microsoft Edge que o MiniFlix usa). Baixe a versão COMPLETA, que
+    já o inclui, ou instale o "Microsoft Edge WebView2 Runtime" pelo
+    site da Microsoft.
+
+  "Não foi possível abrir a interface do MiniFlix"
+    Normalmente o .zip não foi extraído por inteiro ou um antivírus
+    bloqueou algum arquivo da pasta "bin". Extraia tudo de novo, numa
+    pasta nova. O motivo técnico fica em data\logs\miniflix.log.
 
   O YouTube parou de baixar ("pediu uma verificação", "falha no
   download")

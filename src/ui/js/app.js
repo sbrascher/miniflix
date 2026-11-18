@@ -4,6 +4,8 @@ import { icone } from './icones.js';
 import { renderCatalogo } from './catalogo.js';
 import { renderPlayer } from './player.js';
 import { renderAdmin } from './admin.js';
+import { atualizarFila } from './fila.js';
+import { confirmar, toast } from './componentes.js';
 
 const $ = (s) => document.querySelector(s);
 const raiz = $('#app');
@@ -86,6 +88,42 @@ bridge.on('catalogo.atualizado', async () => {
   atualizarTelaAtual();
 });
 
+// ---------- Fila ----------
+const estadosAnteriores = new Map();
+
+function aoMudarFila(itens) {
+  // Avisa quando um item termina (útil se o usuário estiver no catálogo assistindo outra coisa).
+  for (const i of itens) {
+    const antes = estadosAnteriores.get(i.id);
+    if (antes && antes !== i.estado) {
+      if (i.estado === 'concluido') toast(`“${i.titulo}” foi adicionado ao catálogo.`);
+      else if (i.estado === 'erro') toast(`Falha em “${i.titulo}”: ${i.mensagem}`, 'erro');
+    }
+    estadosAnteriores.set(i.id, i.estado);
+  }
+  atualizarFila(itens);
+
+  // Indicador na engrenagem enquanto há trabalho em andamento.
+  const ocupada = itens.some((i) => i.estado === 'aguardando' || i.estado === 'processando');
+  const btn = $('#btn-admin');
+  btn.querySelector('.indicador')?.remove();
+  if (ocupada) btn.append(h('span', { class: 'indicador animate-pulse', 'aria-hidden': 'true' }));
+  btn.title = ocupada ? 'Área administrativa — processando vídeos' : 'Área administrativa';
+}
+
+bridge.on('fila.atualizada', aoMudarFila);
+
+// Fechar a janela com a fila trabalhando: o C# pergunta por aqui.
+bridge.on('app.confirmarSaida', async () => {
+  const sair = await confirmar({
+    titulo: 'Sair do MiniFlix?',
+    mensagem: 'Há vídeos sendo importados ou baixados. Se sair agora, o processamento será cancelado e os arquivos incompletos serão descartados.',
+    textoConfirmar: 'Cancelar e sair',
+    perigoso: true,
+  });
+  if (sair) bridge.call('app.sair');
+});
+
 // ---------- Rotas ----------
 function rotaAtual() {
   const partes = location.hash.replace(/^#\/?/, '').split('/');
@@ -124,8 +162,6 @@ function navegar() {
 window.addEventListener('hashchange', navegar);
 
 // ---------- Início ----------
-$('#icone-busca').append(icone('search', 18));
-$('#btn-admin').append(icone('settings', 20));
 aplicarTema(estado.tema);
 
 (async () => {
@@ -133,6 +169,7 @@ aplicarTema(estado.tema);
     const cfg = await bridge.call('config.obter');
     aplicarTema(cfg.tema);
     await carregarCatalogo();
+    aoMudarFila(await bridge.call('fila.listar'));
     navegar();
   } catch (e) {
     raiz.replaceChildren(h('div', { class: 'mx-auto mt-24 max-w-md text-center' },

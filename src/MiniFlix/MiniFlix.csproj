@@ -21,6 +21,10 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MiniFlix.Tests" />
+  </ItemGroup>
+
   <!-- Frontend (src/ui) copiado para a pasta /ui ao lado do .exe -->
   <ItemGroup>
     <Content Include="..\ui\**\*" Exclude="..\ui\css\input.css" Link="ui\%(RecursiveDir)%(Filename)%(Extension)"

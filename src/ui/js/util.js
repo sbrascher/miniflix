@@ -9,7 +9,13 @@ export function h(tag, attrs = {}, ...filhos) {
   for (const [k, v] of Object.entries(attrs ?? {})) {
     if (v == null || v === false) continue;
     if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
-    else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      // Aceita propriedades CSS customizadas: { '--matiz': 120 }
+      for (const [prop, valor] of Object.entries(v)) {
+        if (prop.startsWith('--')) el.style.setProperty(prop, String(valor));
+        else el.style[prop] = valor;
+      }
+    }
     else el.setAttribute(k, v === true ? '' : String(v));
   }
   for (const f of filhos.flat(Infinity)) {

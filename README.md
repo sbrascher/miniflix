@@ -2,7 +2,7 @@
 
 **Seu catálogo de vídeos offline, no pendrive.** O MiniFlix é um "mini streaming" para Windows que roda direto de qualquer pasta ou pendrive. Você baixa ou importa vídeos uma vez e depois assiste sem internet, em qualquer PC, sem instalar nada e sem deixar rastros no computador.
 
-> 🚧 **Status: em desenvolvimento.** O protótipo técnico e o catálogo (etapas 1 e 2) estão prontos. Player completo, importação e download vêm a seguir. Veja o [roadmap](#roadmap).
+> 🚧 **Status: em desenvolvimento.** Catálogo, administração, importação de arquivos e download do YouTube já funcionam. Faltam o player completo (atalhos e "continuar assistindo") e o polimento visual. Veja o [roadmap](#roadmap).
 
 ---
 
@@ -69,13 +69,17 @@ dotnet test MiniFlix.slnx    # testes unitários
 
 O CSS compilado (`src\ui\css\app.css`) é versionado, então o Tailwind só é necessário para alterar estilos. Não é preciso Node.
 
-Para gerar uma versão totalmente portátil, coloque os binários de terceiros em `vendor\bin\`. A pasta não é versionada; o `build.ps1` a copia para `dist\MiniFlix\bin\`.
+Para gerar uma versão totalmente portátil, os binários de terceiros ficam em `vendor\bin\`. A pasta não é versionada; o `build.ps1` a copia para `dist\MiniFlix\bin\`. O script abaixo baixa o yt-dlp, o Deno e o ffmpeg (cerca de 310 MB):
+
+```powershell
+.\tools\baixar-dependencias.ps1
+```
 
 | Arquivo | Onde obter |
 |---|---|
 | `webview2\` | [WebView2 Fixed Version Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (x64, extraído) |
 | `yt-dlp.exe` | [github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) |
-| `ffmpeg.exe`, `ffprobe.exe` | [ffmpeg.org](https://ffmpeg.org/download.html) |
+| `ffmpeg.exe`, `ffprobe.exe` + DLLs | [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases) (build *gpl-shared*) |
 | `deno.exe` | [deno.com](https://deno.com/) (runtime JS exigido pelo yt-dlp para o YouTube) |
 
 Sem `vendor\bin\webview2`, o app usa o WebView2 instalado no Windows.
@@ -96,10 +100,10 @@ Sem `vendor\bin\webview2`, o app usa o WebView2 instalado no Windows.
 - [x] **1. Protótipo técnico:** WebView2 portátil, host virtual, seek em vídeo de mais de 1 GB, liberação de arquivo.
 - [x] **2. Catálogo:** leitura de `/videos`, cache, busca, filtro por categoria, tema claro/escuro e player básico.
 - [ ] 3. Player: atalhos e "continuar assistindo".
-- [ ] 4. Importação de vídeos locais.
-- [ ] 5. Download do YouTube (yt-dlp) com fila e progresso.
+- [x] **4. Importação de vídeos locais:** vários arquivos de uma vez, cópia sem reconversão quando possível, capa automática, fila com progresso e cancelamento.
+- [x] **5. Download do YouTube:** até 1080p, H.264/AAC, capa e descrição do vídeo, mensagens de erro claras e botão para atualizar o yt-dlp.
 - [x] **6. Gerenciamento do acervo:** listagem com filtro, editar título/categoria/descrição e excluir com confirmação.
-- [ ] 7. Tema claro/escuro e polimento visual (Tailwind compilado localmente).
+- [x] **7. Visual "Soft UI":** relevo tátil nos temas claro (off-white) e escuro (grafite), com destaque laranja. Contraste WCAG AA, suporte a Alto Contraste do Windows e a "reduzir movimento". Tokens e componentes em `src/ui/css/input.css`.
 - [ ] 8. Empacotamento final e teste em PC limpo, a partir do pendrive.
 
 O plano completo está em [`plano.md`](plano.md).

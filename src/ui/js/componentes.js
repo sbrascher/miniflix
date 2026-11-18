@@ -7,23 +7,22 @@ import { icone } from './icones.js';
  * Abre um modal. `corpo` é um nó (ou lista); `acoes` recebe a função fechar(valor) e devolve os botões.
  * Retorna uma Promise com o valor passado a fechar() (ou undefined se fechado por Esc/clique fora).
  */
+let contadorModais = 0;
+
 export function abrirModal({ titulo, corpo, acoes, largura = 'max-w-lg' }) {
   return new Promise((resolve) => {
-    const dlg = h('dialog', {
-      class: `m-auto w-[calc(100%-2rem)] ${largura} rounded-2xl bg-superficie p-0 text-texto shadow-2xl ring-1 ring-borda ` +
-             'backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-[entrar_.15s_ease-out]',
-      'aria-labelledby': 'modal-titulo',
-    });
+    const idTitulo = `modal-titulo-${++contadorModais}`;
+    const dlg = h('dialog', { class: `modal ${largura}`, 'aria-labelledby': idTitulo });
     let valor;
     const fechar = (v) => { valor = v; dlg.close(); };
 
     dlg.append(
-      h('div', { class: 'flex items-start justify-between gap-4 border-b border-borda px-6 py-4' },
-        h('h2', { id: 'modal-titulo', class: 'font-display text-lg font-bold' }, titulo),
-        h('button', { type: 'button', class: 'btn-icone -mr-2 -mt-1 h-8 w-8', 'aria-label': 'Fechar', onclick: () => fechar() },
-          icone('close', 16))),
-      h('div', { class: 'px-6 py-5' }, corpo),
-      h('div', { class: 'flex justify-end gap-2 border-t border-borda bg-superficie-2/50 px-6 py-4' }, acoes(fechar)),
+      h('div', { class: 'flex items-center justify-between gap-4 px-6 pb-3 pt-5' },
+        h('h2', { id: idTitulo, class: 'font-display text-lg font-bold' }, titulo),
+        h('button', { type: 'button', class: 'btn-icone -mr-2', 'aria-label': 'Fechar', onclick: () => fechar() },
+          icone('close', 20))),
+      h('div', { class: 'px-6 pb-6 pt-2' }, corpo),
+      h('div', { class: 'modal-rodape flex justify-end gap-3 px-6 py-4' }, acoes(fechar)),
     );
 
     dlg.addEventListener('click', (e) => { if (e.target === dlg) fechar(); }); // clique no fundo
@@ -54,18 +53,13 @@ let pilhaToasts;
 /** Aviso rápido no canto da tela. tipo: 'ok' | 'erro'. */
 export function toast(mensagem, tipo = 'ok') {
   if (!pilhaToasts) {
-    pilhaToasts = h('div', {
-      class: 'pointer-events-none fixed bottom-5 right-5 z-50 flex flex-col items-end gap-2',
-      role: 'status', 'aria-live': 'polite',
-    });
+    pilhaToasts = h('div', { class: 'pointer-events-none fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3' });
     document.body.append(pilhaToasts);
   }
   const erro = tipo === 'erro';
-  const el = h('div', {
-    class: 'pointer-events-auto flex max-w-sm items-center gap-3 rounded-xl bg-superficie px-4 py-3 text-sm font-medium ' +
-           'shadow-xl ring-1 ring-borda transition duration-300 animate-[entrar_.2s_ease-out]',
-  },
-    h('span', { class: erro ? 'text-destaque' : 'text-emerald-500' }, icone(erro ? 'warning' : 'check_circle', 20, true)),
+  // Erros são anunciados imediatamente por leitores de tela; confirmações, com educação.
+  const el = h('div', { class: 'toast pointer-events-auto', role: erro ? 'alert' : 'status' },
+    h('span', { class: `flex ${erro ? 'text-perigo' : 'text-sucesso'}` }, icone(erro ? 'error' : 'check_circle', 22, true)),
     mensagem);
   pilhaToasts.append(el);
   setTimeout(() => { el.classList.add('opacity-0', 'translate-y-2'); setTimeout(() => el.remove(), 300); }, erro ? 6000 : 3000);

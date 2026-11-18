@@ -1,48 +1,146 @@
-/* Fonte do Tailwind. Compile com:  .\build.ps1 -SoCss   (gera css/app.css, que é versionado) */
+/* ==========================================================================
+   MiniFlix — sistema de design "Soft UI" (relevo tátil, aparência emborrachada)
+
+   Compile com:  .\build.ps1 -SoCss   (gera css/app.css, que é versionado)
+
+   Organização:
+     1. Tokens (cores, sombras, raios, movimento) por tema   → :root / [data-theme]
+     2. Ponte com o Tailwind (@theme)                         → utilitários bg-*, text-*, shadow-*
+     3. Fontes (ícones locais)
+     4. Base (elementos HTML)
+     5. Componentes semânticos (.painel, .btn, .campo, .card-video…)
+     6. Acessibilidade (Alto Contraste do Windows, reduzir movimento)
+
+   Regra de uso: o JavaScript usa utilitários do Tailwind só para LAYOUT (flex, grid, gap,
+   margens). Toda a identidade visual (relevo, cores, raios) vem dos componentes abaixo.
+   ========================================================================== */
+
 @import "tailwindcss";
 @source "../";
 
-/* Modo escuro controlado por <html data-theme="escuro|claro"> (não pela preferência do sistema). */
+/* Tema controlado por <html data-theme="escuro|claro">. */
 @custom-variant dark (&:where([data-theme=escuro], [data-theme=escuro] *));
 
-:root {
-  --fundo: #fafafa;
-  --superficie: #ffffff;
-  --superficie-2: #f4f4f5;
-  --borda: #e4e4e7;
-  --texto: #18181b;
-  --suave: #52525b;
-  --marca: #c9341b;     /* fundo de botões (contraste ≥ 4.5 com branco) */
-  --destaque: #b52e17;  /* texto/realces sobre o fundo */
+/* --------------------------------------------------------------------------
+   1. TOKENS
+   O relevo precisa de um fundo em tom MÉDIO: só assim a luz (borda de cima)
+   e a sombra (borda de baixo) aparecem. Por isso nada de preto/branco puros.
+   Contrastes (WCAG): texto ≥ 7:1, texto suave ≥ 4.5:1, botão primário ≥ 4.5:1.
+   -------------------------------------------------------------------------- */
+:root,
+[data-theme=claro] {
   color-scheme: light;
-}
-[data-theme=escuro] {
-  --fundo: #0c0c0e;
-  --superficie: #17171a;
-  --superficie-2: #202024;
-  --borda: #2a2a30;
-  --texto: #f4f4f5;
-  --suave: #a1a1aa;
-  --marca: #c9341b;
-  --destaque: #ff7a5c;
-  color-scheme: dark;
+
+  /* Superfícies (off-white quente) */
+  --fundo:        #e8e4de;
+  --superficie:   #ece8e2;   /* painéis e cards elevados */
+  --superficie-2: #f1eee9;   /* botões, partes mais "salientes" */
+  --afundado:     #e0dbd4;   /* campos, trilhos (sob a superfície) */
+  --borda:        #d6d0c8;
+
+  /* Texto */
+  --texto: #2a2622;
+  --suave: #625b53;
+
+  /* Marca (laranja queimado) */
+  --marca:        #bf4f1c;   /* fundo de botão primário: branco sobre ele = 4.8:1 */
+  --marca-topo:   #c4531f;   /* gradiente sutil do botão (luz em cima) */
+  --marca-base:   #ab4517;
+  --destaque:     #983d16;   /* texto/ícones de destaque sobre o fundo */
+  --perigo:       #b4232c;
+  --sucesso:      #17663f;
+  --aviso:        #94650a;
+
+  /* Luz e sombra do relevo */
+  --luz:    rgb(255 255 255 / 0.9);
+  --sombra: rgb(112 96 80 / 0.32);
+  --sombra-forte: rgb(112 96 80 / 0.42);
+  --brilho-borda: rgb(255 255 255 / 0.65);  /* filete de luz na borda superior */
 }
 
+[data-theme=escuro] {
+  color-scheme: dark;
+
+  /* Superfícies (grafite azulado) */
+  --fundo:        #22252b;
+  --superficie:   #272a31;
+  --superficie-2: #2d3139;
+  --afundado:     #1c1f24;
+  --borda:        #353a43;
+
+  --texto: #eceef2;
+  --suave: #a7adb8;
+
+  --marca:      #bf4f1c;
+  --marca-topo: #c4531f;
+  --marca-base: #a84416;
+  --destaque:   #ff8a57;
+  --perigo:     #ff7c84;
+  --sucesso:    #4ccf8d;
+  --aviso:      #f2b84b;
+
+  --luz:    rgb(255 255 255 / 0.055);
+  --sombra: rgb(0 0 0 / 0.5);
+  --sombra-forte: rgb(0 0 0 / 0.62);
+  --brilho-borda: rgb(255 255 255 / 0.07);
+}
+
+:root {
+  /* Relevo em 3 níveis + afundado. Sempre: luz em cima/esquerda, sombra embaixo/direita. */
+  --relevo-1: -2px -2px 5px var(--luz), 3px 3px 7px var(--sombra), inset 0 1px 0 var(--brilho-borda);
+  --relevo-2: -5px -5px 12px var(--luz), 6px 6px 14px var(--sombra), inset 0 1px 0 var(--brilho-borda);
+  --relevo-3: -8px -8px 20px var(--luz), 12px 14px 28px var(--sombra-forte), inset 0 1px 0 var(--brilho-borda);
+  --afundar:  inset 3px 3px 7px var(--sombra), inset -3px -3px 7px var(--luz);
+  --afundar-leve: inset 2px 2px 4px var(--sombra), inset -2px -2px 4px var(--luz);
+  --brilho-marca: 0 6px 16px -4px color-mix(in srgb, var(--marca) 55%, transparent);
+
+  /* Raios */
+  --raio-sm: 0.625rem;
+  --raio-md: 0.875rem;
+  --raio-lg: 1.25rem;
+  --raio-xl: 1.75rem;
+
+  /* Movimento */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --rapido: 140ms;
+  --medio: 240ms;
+}
+
+/* --------------------------------------------------------------------------
+   2. PONTE COM O TAILWIND
+   -------------------------------------------------------------------------- */
 @theme inline {
   --color-fundo: var(--fundo);
   --color-superficie: var(--superficie);
   --color-superficie-2: var(--superficie-2);
+  --color-afundado: var(--afundado);
   --color-borda: var(--borda);
   --color-texto: var(--texto);
   --color-suave: var(--suave);
   --color-marca: var(--marca);
   --color-destaque: var(--destaque);
+  --color-perigo: var(--perigo);
+  --color-sucesso: var(--sucesso);
+  --color-aviso: var(--aviso);
+
+  --shadow-relevo-1: var(--relevo-1);
+  --shadow-relevo-2: var(--relevo-2);
+  --shadow-relevo-3: var(--relevo-3);
+  --shadow-afundado: var(--afundar);
+
+  --radius-sm: var(--raio-sm);
+  --radius-md: var(--raio-md);
+  --radius-lg: var(--raio-lg);
+  --radius-xl: var(--raio-xl);
+
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --font-display: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 }
 
-/* Ícones: Material Symbols Rounded (Google, Apache 2.0), arquivo local — sem CDN.
-   Lista de nomes: https://fonts.google.com/icons  ·  uso: <span class="icone">search</span> */
+/* --------------------------------------------------------------------------
+   3. FONTES — ícones Material Symbols Rounded (Google, Apache 2.0), arquivo local.
+   Nomes: https://fonts.google.com/icons
+   -------------------------------------------------------------------------- */
 @font-face {
   font-family: 'Material Symbols Rounded';
   font-style: normal;
@@ -50,6 +148,7 @@
   font-display: block;
   src: url(../fonts/material-symbols-rounded.woff2) format('woff2');
 }
+
 .icone {
   font-family: 'Material Symbols Rounded';
   font-weight: normal;
@@ -69,38 +168,463 @@
 .icone-cheio { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
 @keyframes entrar {
-  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: none; }
 }
 
+/* --------------------------------------------------------------------------
+   4. BASE
+   -------------------------------------------------------------------------- */
 @layer base {
-  html { background: var(--fundo); }
+  html {
+    background: var(--fundo);
+    accent-color: var(--marca);       /* checkboxes, radios e afins nativos */
+    scrollbar-color: color-mix(in srgb, var(--suave) 45%, transparent) transparent;
+  }
   body { @apply bg-fundo text-texto font-sans antialiased; }
-  :focus-visible { @apply outline-2 outline-offset-2 outline-destaque; }
+
+  :focus-visible {
+    outline: 2px solid var(--destaque);
+    outline-offset: 3px;
+  }
   ::selection { background: color-mix(in srgb, var(--marca) 35%, transparent); }
+
+  h1, h2, h3 { text-wrap: balance; }
 }
 
+/* --------------------------------------------------------------------------
+   5. COMPONENTES
+   -------------------------------------------------------------------------- */
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold
-           bg-superficie-2 text-texto ring-1 ring-borda transition
-           hover:ring-destaque/60 hover:text-destaque active:scale-[0.98] disabled:opacity-50;
+
+  /* ---------- Superfícies ---------- */
+
+  /* Bloco elevado (cards da administração, listas, painéis). */
+  .painel {
+    background: var(--superficie);
+    border-radius: var(--raio-lg);
+    box-shadow: var(--relevo-2);
   }
-  .btn-icone {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg text-suave transition
-           hover:bg-superficie-2 hover:text-texto active:scale-95;
+
+  /* Área rebaixada dentro de um painel (bandeja de capa, moldura do player, ícone de card). */
+  .bandeja {
+    background: var(--afundado);
+    border-radius: var(--raio-md);
+    box-shadow: var(--afundar);
   }
-  .btn-primario {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
-           bg-marca text-white shadow-sm transition hover:brightness-110 active:scale-[0.98];
+
+  /* "Pastilha" de ícone em relevo (ícone dos cards, itens da fila). */
+  .pastilha {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-shrink: 0;
+    border-radius: var(--raio-md);
+    background: var(--superficie-2);
+    box-shadow: var(--relevo-1);
+    color: var(--destaque);
   }
+
+  /* Cabeçalho fixo */
+  .barra-topo {
+    background: color-mix(in srgb, var(--fundo) 88%, transparent);
+    backdrop-filter: blur(12px);          /* um único elemento: custo aceitável */
+    box-shadow: 0 6px 16px -10px var(--sombra-forte), inset 0 -1px 0 var(--brilho-borda);
+  }
+
+  /* ---------- Botões ----------
+     Todos "afundam" ao serem pressionados (relevo → sombra interna): é o que dá
+     a sensação de borracha. Transições só em propriedades baratas. */
+  .btn,
+  .btn-primario,
   .btn-perigo {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold
-           bg-red-600 text-white shadow-sm transition hover:bg-red-700 active:scale-[0.98] disabled:opacity-50;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.5rem 1.1rem;
+    border-radius: var(--raio-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: box-shadow var(--rapido) var(--ease), transform var(--rapido) var(--ease),
+                color var(--rapido), filter var(--rapido);
   }
-  .rotulo { @apply mb-1.5 block text-sm font-medium; }
+  .btn {
+    background: var(--superficie-2);
+    color: var(--texto);
+    box-shadow: var(--relevo-1);
+  }
+  .btn:hover { color: var(--destaque); }
+  .btn:active,
+  .btn[aria-pressed=true] {
+    box-shadow: var(--afundar-leve);
+    transform: translateY(1px);
+  }
+
+  .btn-primario {
+    color: #fff;
+    background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
+    box-shadow: var(--relevo-1), var(--brilho-marca), inset 0 1px 0 rgb(255 255 255 / 0.22);
+  }
+  .btn-primario:hover { filter: brightness(1.07); }
+  .btn-primario:active {
+    box-shadow: inset 2px 3px 6px rgb(0 0 0 / 0.35), inset -1px -1px 3px rgb(255 255 255 / 0.12);
+    transform: translateY(1px);
+  }
+
+  .btn-perigo {
+    color: #fff;
+    background: linear-gradient(180deg, #c22d35, #a11f27);
+    box-shadow: var(--relevo-1), inset 0 1px 0 rgb(255 255 255 / 0.2);
+  }
+  .btn-perigo:hover { filter: brightness(1.08); }
+  .btn-perigo:active { box-shadow: inset 2px 3px 6px rgb(0 0 0 / 0.35); transform: translateY(1px); }
+
+  /* Botão só com ícone (cabeçalho, ações de tabela). Discreto em repouso, relevo no hover. */
+  .btn-icone {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    color: var(--suave);
+    cursor: pointer;
+    transition: box-shadow var(--rapido) var(--ease), color var(--rapido), background-color var(--rapido);
+  }
+  .btn-icone:hover {
+    color: var(--texto);
+    background: var(--superficie-2);
+    box-shadow: var(--relevo-1);
+  }
+  .btn-icone:active { box-shadow: var(--afundar-leve); }
+  .btn-icone-perigo:hover { color: var(--perigo); }
+
+  /* Variante sempre em relevo (cabeçalho). */
+  .btn-icone-elevado {
+    background: var(--superficie-2);
+    box-shadow: var(--relevo-1);
+    color: var(--texto);
+  }
+
+  .btn:disabled, .btn-primario:disabled, .btn-perigo:disabled, .btn-icone:disabled,
+  .btn[aria-disabled=true] {
+    cursor: not-allowed;
+    opacity: 0.5;
+    filter: saturate(0.4);
+    transform: none;
+  }
+
+  /* ---------- Formulários ---------- */
+  .rotulo {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  /* Campos são "escavados" no fundo. */
   .campo {
-    @apply h-10 rounded-lg bg-superficie-2 px-3 text-sm text-texto ring-1 ring-borda transition
-           placeholder:text-suave focus:outline-none focus:ring-2 focus:ring-destaque;
+    min-height: 2.75rem;
+    padding: 0.55rem 0.95rem;
+    border-radius: var(--raio-md);
+    background: var(--afundado);
+    color: var(--texto);
+    font-size: 0.9rem;
+    box-shadow: var(--afundar);
+    transition: box-shadow var(--rapido) var(--ease);
   }
+  .campo::placeholder { color: var(--suave); opacity: 1; }
+  .campo:focus { outline: none; box-shadow: var(--afundar), 0 0 0 2px var(--destaque); }
+  .campo:disabled { opacity: 0.55; cursor: not-allowed; }
+  textarea.campo { line-height: 1.6; resize: vertical; }
+
+  /* <select> com seta própria (o ícone fica num elemento irmão .campo-seta). */
+  .campo-select { appearance: none; padding-right: 2.5rem; cursor: pointer; }
+  .campo-seta {
+    pointer-events: none;
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--suave);
+  }
+  .campo-select option { background: var(--superficie); color: var(--texto); }
+
+  /* ---------- Pequenos elementos ---------- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--superficie-2);
+    color: var(--texto);
+    box-shadow: var(--relevo-1);
+    white-space: nowrap;
+  }
+  .chip-marca {
+    color: #fff;
+    background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
+    box-shadow: var(--relevo-1), inset 0 1px 0 rgb(255 255 255 / 0.2);
+  }
+
+  .selo-duracao {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: rgb(18 20 24 / 0.78);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  }
+
+  /* Barra de progresso: trilho afundado + preenchimento com brilho. */
+  .trilho {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--afundado);
+    box-shadow: var(--afundar-leve);
+  }
+  .trilho-preenchimento {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--marca-base), var(--destaque));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--destaque) 60%, transparent);
+    transition: width var(--medio) var(--ease);
+  }
+
+  .alerta-erro {
+    border-radius: var(--raio-sm);
+    padding: 0.55rem 0.8rem;
+    font-size: 0.875rem;
+    color: var(--perigo);
+    background: color-mix(in srgb, var(--perigo) 12%, transparent);
+    box-shadow: var(--afundar-leve);
+  }
+
+  /* ---------- Card de vídeo ----------
+     Card elevado com a capa numa bandeja rebaixada. No hover o card sobe e a
+     sombra cresce. A sombra maior está num ::after e anima só a OPACIDADE
+     (barato para a GPU mesmo com dezenas de cards). */
+  .card-video {
+    position: relative;
+    display: block;
+    padding: 0.55rem 0.55rem 0.8rem;
+    border-radius: var(--raio-lg);
+    background: var(--superficie);
+    box-shadow: var(--relevo-2);
+    transition: transform var(--medio) var(--ease);
+    isolation: isolate;
+  }
+  .card-video::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    box-shadow: var(--relevo-3);
+    opacity: 0;
+    transition: opacity var(--medio) var(--ease);
+    pointer-events: none;
+  }
+  .card-video:hover,
+  .card-video:focus-visible { transform: translateY(-4px); }
+  .card-video:hover::after,
+  .card-video:focus-visible::after { opacity: 1; }
+  .card-video:active { transform: translateY(-1px); }
+  .card-video:focus-visible { outline-offset: 4px; }
+
+  .card-video-capa {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: var(--raio-md);
+    background: var(--afundado);
+    box-shadow: var(--afundar);
+  }
+  .card-video-capa img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 400ms var(--ease);
+  }
+  .card-video:hover .card-video-capa img,
+  .card-video:focus-visible .card-video-capa img { transform: scale(1.05); }
+
+  /* Capa para vídeos sem imagem: gradiente com matiz estável por vídeo (--matiz, 0–359). */
+  .capa-substituta {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    color: rgb(255 255 255 / 0.8);
+    background: linear-gradient(135deg,
+      hsl(var(--matiz, 20) 40% 34%),
+      hsl(calc(var(--matiz, 20) + 40) 50% 18%));
+  }
+
+  /* Botão "Assistir" que aparece sobre a capa. */
+  .card-video-acao {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 0);
+    opacity: 0;
+    transition: opacity var(--medio) var(--ease), background-color var(--medio);
+  }
+  .card-video:hover .card-video-acao,
+  .card-video:focus-visible .card-video-acao { opacity: 1; background: rgb(0 0 0 / 0.32); }
+
+  .card-video-titulo {
+    margin: 0.7rem 0.3rem 0;
+    font-size: 0.94rem;
+    font-weight: 600;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: color var(--rapido);
+  }
+  .card-video:hover .card-video-titulo { color: var(--destaque); }
+
+  /* Coluna do player: largura limitada pela altura da janela (16:9) para o título
+     ficar visível sem rolar, e alinhado com o vídeo. */
+  .coluna-player {
+    width: 100%;
+    margin-inline: auto;
+    max-width: min(72rem, calc((100vh - 17rem) * 16 / 9));
+  }
+
+  /* Moldura do player: "tela embutida" no painel. */
+  .moldura-player {
+    padding: 0.6rem;
+    border-radius: var(--raio-xl);
+    background: var(--superficie);
+    box-shadow: var(--relevo-3);
+  }
+  .moldura-player > .tela {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: calc(var(--raio-xl) - 0.45rem);
+    background: #000;
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6), inset 0 2px 10px rgb(0 0 0 / 0.6);
+  }
+
+  /* ---------- Tabela do acervo ---------- */
+  .tabela {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .tabela th {
+    padding: 0.85rem 1rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--suave);
+  }
+  .tabela td { padding: 0.75rem 1rem; vertical-align: middle; }
+  .tabela tbody tr { transition: background-color var(--rapido); }
+  .tabela tbody tr:hover { background: color-mix(in srgb, var(--afundado) 55%, transparent); }
+  .tabela tbody tr + tr td { box-shadow: inset 0 1px 0 var(--borda); }
+
+  .lista-divisoria > * + * { box-shadow: inset 0 1px 0 var(--borda); }
+
+  /* ---------- Sobreposições ---------- */
+  .modal {
+    margin: auto;
+    padding: 0;
+    width: calc(100% - 2rem);
+    border-radius: var(--raio-xl);
+    background: var(--superficie);
+    color: var(--texto);
+    box-shadow: var(--relevo-3);
+    animation: entrar 160ms var(--ease);
+  }
+  .modal::backdrop {
+    background: rgb(10 11 14 / 0.55);
+    backdrop-filter: blur(4px);
+  }
+  .modal-rodape {
+    background: color-mix(in srgb, var(--afundado) 45%, transparent);
+    box-shadow: inset 0 1px 0 var(--borda);
+  }
+
+  .toast {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: 24rem;
+    padding: 0.8rem 1rem;
+    border-radius: var(--raio-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    background: var(--superficie-2);
+    color: var(--texto);
+    box-shadow: var(--relevo-3);
+    animation: entrar 200ms var(--ease);
+    transition: opacity 300ms, transform 300ms var(--ease);
+  }
+
+  /* Indicador pulsante (fila trabalhando). */
+  .indicador {
+    position: absolute;
+    right: 0.3rem;
+    top: 0.3rem;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 999px;
+    background: var(--destaque);
+    box-shadow: 0 0 0 2px var(--fundo), 0 0 8px var(--destaque);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. ACESSIBILIDADE
+   -------------------------------------------------------------------------- */
+
+/* Alto Contraste do Windows: sombras são removidas pelo sistema, então o relevo
+   some. Bordas reais garantem que botões, campos e cards continuem visíveis. */
+@media (forced-colors: active) {
+  .painel, .bandeja, .pastilha, .btn, .btn-primario, .btn-perigo, .btn-icone-elevado,
+  .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho {
+    border: 1px solid CanvasText;
+  }
+  .trilho-preenchimento { background: Highlight; }
+  .campo:focus { outline: 2px solid Highlight; }
+}
+
+/* Quem pede menos movimento no Windows não vê zoom, elevação nem animações. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-video:hover, .card-video:focus-visible { transform: none; }
+  .card-video:hover .card-video-capa img { transform: none; }
 }

@@ -6,37 +6,43 @@ import { icone } from './icones.js';
  * Retorna uma função de limpeza que descarrega o vídeo para liberar o arquivo no Windows.
  */
 export function renderPlayer(raiz, v) {
-  const voltar = h('a', { href: '#/', class: 'btn' }, icone('arrow_back', 16), 'Voltar ao catálogo');
+  const voltar = h('a', { href: '#/', class: 'btn' }, icone('arrow_back', 18), 'Voltar ao catálogo');
 
   if (!v) {
-    raiz.replaceChildren(h('div', { class: 'mx-auto max-w-3xl px-4 py-16 text-center sm:px-6' },
-      h('h1', { class: 'font-display text-2xl font-bold' }, 'Vídeo não encontrado'),
-      h('p', { class: 'mt-2 text-suave' }, 'Ele pode ter sido excluído ou movido.'),
-      h('div', { class: 'mt-6' }, voltar)));
+    raiz.replaceChildren(h('div', { class: 'px-4 py-16 sm:px-6' },
+      h('div', { class: 'painel mx-auto max-w-lg px-8 py-10 text-center' },
+        h('div', { class: 'pastilha mx-auto mb-5 h-16 w-16' }, icone('videocam_off', 32)),
+        h('h1', { class: 'font-display text-2xl font-bold' }, 'Vídeo não encontrado'),
+        h('p', { class: 'mt-2 text-suave' }, 'Ele pode ter sido excluído ou movido.'),
+        h('div', { class: 'mt-6' }, voltar))));
     return () => {};
   }
 
   const video = h('video', {
     src: v.videoUrl, controls: true, autoplay: true, preload: 'auto', playsinline: true,
-    poster: v.capaUrl, class: 'h-full w-full bg-black',
-    'aria-label': `Vídeo: ${v.titulo}`,
+    poster: v.capaUrl, class: 'h-full w-full', 'aria-label': `Vídeo: ${v.titulo}`,
   });
 
+  const info = (nomeIcone, texto) => h('span', { class: 'inline-flex items-center gap-1.5' }, icone(nomeIcone, 18), texto);
   const meta = [
-    h('span', { class: 'rounded-full bg-marca px-2.5 py-0.5 text-xs font-semibold text-white' }, v.categoria),
-    v.dataPublicacao && h('span', { class: 'inline-flex items-center gap-1.5' }, icone('calendar_today', 16), fmtData(v.dataPublicacao)),
-    v.duracaoSegundos && h('span', { class: 'inline-flex items-center gap-1.5' }, icone('schedule', 16), fmtDuracao(v.duracaoSegundos)),
+    h('span', { class: 'chip chip-marca' }, v.categoria),
+    v.dataPublicacao && info('calendar_today', fmtData(v.dataPublicacao)),
+    v.duracaoSegundos && info('schedule', fmtDuracao(v.duracaoSegundos)),
+    // Abre no navegador padrão (o C# intercepta links externos).
+    v.origem === 'youtube' && v.urlOrigem && h('a', {
+      href: v.urlOrigem, target: '_blank', rel: 'noopener', class: 'inline-flex items-center gap-1.5 hover:text-destaque',
+    }, icone('open_in_new', 18), 'Ver no YouTube'),
   ];
 
-  // Coluna com largura limitada pela altura da janela (16:9), para o título ficar visível
-  // sem rolar e alinhado com o vídeo.
-  raiz.replaceChildren(h('div', { class: 'px-4 pb-16 pt-5 sm:px-6' },
-    h('div', { class: 'mx-auto w-full', style: { maxWidth: 'min(72rem, calc((100vh - 15rem) * 16 / 9))' } },
+  raiz.replaceChildren(h('div', { class: 'px-4 pb-16 pt-6 sm:px-6' },
+    h('div', { class: 'coluna-player' },
       voltar,
-      h('div', { class: 'mt-4 aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl shadow-black/40 ring-1 ring-borda' }, video),
-      h('h1', { class: 'mt-6 font-display text-2xl font-bold leading-tight sm:text-3xl' }, v.titulo),
-      h('div', { class: 'mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-suave' }, meta),
-      v.descricao && h('p', { class: 'mt-5 max-w-3xl whitespace-pre-line leading-relaxed text-texto/90' }, v.descricao),
+      h('div', { class: 'moldura-player mt-5' }, h('div', { class: 'tela' }, video)),
+      h('h1', { class: 'mt-7 font-display text-2xl font-bold leading-tight sm:text-3xl' }, v.titulo),
+      h('div', { class: 'mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-suave' }, meta),
+      v.descricao && h('div', { class: 'painel mt-6 max-w-3xl px-6 py-5' },
+        h('h2', { class: 'mb-2 text-sm font-semibold text-suave' }, 'Descrição'),
+        h('p', { class: 'whitespace-pre-line leading-relaxed' }, v.descricao)),
     )));
   video.focus({ preventScroll: true });
 

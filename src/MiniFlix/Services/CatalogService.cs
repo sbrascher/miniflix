@@ -166,12 +166,62 @@ public sealed class CatalogService
         Varrer();
     }
 
-    /// <summary>Remove restos de exclusões interrompidas (app fechado no meio).</summary>
+    /// <summary>Remove restos de exclusões e importações/downloads interrompidos (app fechado no meio).</summary>
     public void LimparExclusoesPendentes()
     {
         if (!Directory.Exists(_pastaVideos)) return;
-        foreach (var d in Directory.EnumerateDirectories(_pastaVideos, PrefixoExclusao + "*"))
-            ApagarPastaTemporaria(d);
+        foreach (var prefixo in new[] { PrefixoExclusao, PrefixoTemporario })
+            foreach (var d in Directory.EnumerateDirectories(_pastaVideos, prefixo + "*"))
+                ApagarPastaTemporaria(d);
+    }
+
+    // ---------- Novos vídeos (importação e download) ----------
+
+    private const string PrefixoTemporario = "_tmp-";
+    private readonly object _travaPublicacao = new();
+
+    public bool ExisteId(string id) => Itens.Any(i => i.Meta.Id == id);
+
+    public VideoItem? ObterPorId(string id) => Itens.FirstOrDefault(i => i.Meta.Id == id);
+
+    /// <summary>
+    /// Cria uma pasta de trabalho dentro de /videos (mesma unidade: a publicação é só um rename).
+    /// O prefixo faz a varredura ignorá-la e a limpeza do início apagá-la se o app cair.
+    /// </summary>
+    public string CriarPastaTemporaria()
+    {
+        var pasta = Path.Combine(_pastaVideos, PrefixoTemporario + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(pasta);
+        return pasta;
+    }
+
+    public static void DescartarPastaTemporaria(string pasta)
+    {
+        if (Directory.Exists(pasta)) ApagarPastaTemporaria(pasta);
+    }
+
+    /// <summary>
+    /// Publica um vídeo pronto: a pasta temporária deve conter "video.mp4" (e opcionalmente "capa.jpg").
+    /// Escolhe um slug livre, renomeia os arquivos, grava o JSON e move a pasta. Retorna o slug final.
+    /// </summary>
+    public string Publicar(string pastaTemporaria, VideoMeta meta)
+    {
+        lock (_travaPublicacao)
+        {
+            var slug = Slug.Unico(Slug.Gerar(meta.Titulo), s => Directory.Exists(Path.Combine(_pastaVideos, s)));
+            File.Move(Path.Combine(pastaTemporaria, "video.mp4"), Path.Combine(pastaTemporaria, slug + ".mp4"));
+            var capa = Path.Combine(pastaTemporaria, "capa.jpg");
+            if (File.Exists(capa)) File.Move(capa, Path.Combine(pastaTemporaria, slug + ".jpg"));
+
+            meta.Slug = slug;
+            if (meta.DataAdicionado == default) meta.DataAdicionado = DateTime.Now;
+            JsonStore.Gravar(Path.Combine(pastaTemporaria, slug + ".json"), meta);
+
+            Directory.Move(pastaTemporaria, Path.Combine(_pastaVideos, slug));
+            Log.Info($"Vídeo publicado: {slug} ({meta.Origem})");
+        }
+        Varrer();
+        return meta.Slug;
     }
 
     private static void ApagarPastaTemporaria(string pasta)

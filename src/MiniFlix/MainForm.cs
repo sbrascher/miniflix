@@ -14,6 +14,12 @@ internal sealed class MainForm : Form
     private readonly Bridge _bridge;
     private readonly CatalogService _catalogo;
     private readonly SettingsService _config;
+    private readonly FilaService _fila = new();
+    private readonly ImportacaoLocal _importacao;
+    private readonly DownloadYoutube _youtube;
+    // Arquivos escolhidos no diálogo nativo. A UI só recebe um token: não pode pedir para importar caminhos arbitrários.
+    private readonly Dictionary<string, string> _arquivosEscolhidos = [];
+    private bool _saindo;
     private readonly string[] _args = Environment.GetCommandLineArgs();
     private string _runtimeVersion = "?";
     private string _runtimeSource = "?";
@@ -32,7 +38,19 @@ internal sealed class MainForm : Form
         _bridge = new Bridge(json => RunOnUi(() => _webView.CoreWebView2?.PostWebMessageAsJson(json)));
         _catalogo = new CatalogService(AppPaths.Videos, Path.Combine(AppPaths.Data, "catalog-cache.json"), AppPaths.ToUrl);
         _catalogo.Alterado += () => _bridge.Emitir("catalogo.atualizado");
+        Ferramentas.PastaBin = AppPaths.Bin;
+        _importacao = new ImportacaoLocal(_catalogo, AppPaths.Videos);
+        _youtube = new DownloadYoutube(_catalogo);
+        _fila.Alterada += itens => _bridge.Emitir("fila.atualizada", itens);
         RegistrarComandos();
+
+        // Fechar com a fila trabalhando: a UI pergunta (modal próprio) e responde com "app.sair".
+        FormClosing += (_, e) =>
+        {
+            if (_saindo || !_fila.Ocupada || _webView.CoreWebView2 is null) return;
+            e.Cancel = true;
+            _bridge.Emitir("app.confirmarSaida");
+        };
 
         Controls.Add(_webView);
         Load += async (_, _) => await InitWebViewAsync();
@@ -88,6 +106,98 @@ internal sealed class MainForm : Form
             return _catalogo.Obter(slug) is { } item ? ParaUi(item) : throw new KeyNotFoundException("Vídeo não encontrado.");
         });
 
+        // ---- Ferramentas, importação e fila ----
+        _bridge.Registrar("sistema.ferramentas", _ => Ferramentas.Situacao());
+
+        _bridge.Registrar("importar.escolherArquivos", _ =>
+        {
+            var filtro = string.Join(';', ImportacaoLocal.Extensoes.Select(x => "*" + x));
+            using var dlg = new OpenFileDialog
+            {
+                Title = "Escolha os vídeos para importar",
+                Multiselect = true,
+                Filter = $"Vídeos ({filtro})|{filtro}|Todos os arquivos (*.*)|*.*",
+                RestoreDirectory = true,
+            };
+            // Gancho para testes automatizados (o diálogo nativo não pode ser clicado por automação).
+            var arquivosTeste = Environment.GetEnvironmentVariable("MINIFLIX_TESTE_ARQUIVOS");
+            string[] escolhidos;
+            if (!string.IsNullOrEmpty(arquivosTeste)) escolhidos = arquivosTeste.Split(';', StringSplitOptions.RemoveEmptyEntries);
+            else if (dlg.ShowDialog(this) == DialogResult.OK) escolhidos = dlg.FileNames;
+            else return Array.Empty<object>();
+
+            return escolhidos.Select(caminho =>
+            {
+                var token = Guid.NewGuid().ToString("N");
+                _arquivosEscolhidos[token] = caminho;
+                return (object)new
+                {
+                    token,
+                    nome = Path.GetFileName(caminho),
+                    tamanhoBytes = new FileInfo(caminho).Length,
+                    tituloSugerido = ImportacaoLocal.TituloSugerido(caminho),
+                };
+            }).ToArray();
+        });
+
+        _bridge.Registrar("fila.adicionarLocal", d =>
+        {
+            Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
+            Ferramentas.Exigir(Ferramentas.Ffprobe, "ffprobe");
+            var categoria = d?["categoria"]?.GetValue<string>() ?? "";
+            if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException("Categoria muito longa.");
+            var itens = d?["itens"] as JsonArray ?? throw new ArgumentException("Nenhum arquivo informado.");
+            int n = 0;
+            foreach (var no in itens)
+            {
+                var token = no?["token"]?.GetValue<string>() ?? "";
+                if (!_arquivosEscolhidos.Remove(token, out var caminho)) continue; // token desconhecido ou já usado
+                var titulo = no?["titulo"]?.GetValue<string>() ?? "";
+                if (titulo.Trim().Length > CatalogService.MaxTitulo) throw new ArgumentException("Título muito longo.");
+                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria));
+                n++;
+            }
+            return new { adicionados = n };
+        });
+
+        _bridge.Registrar("fila.adicionarYoutube", d =>
+        {
+            Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
+            Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
+            var categoria = d?["categoria"]?.GetValue<string>() ?? "";
+            if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException("Categoria muito longa.");
+            var url = Bridge.Texto(d, "url");
+            // Evita adicionar o mesmo link duas vezes enquanto ainda está na fila.
+            if (DownloadYoutube.ExtrairId(url) is { } id &&
+                _fila.Itens.Any(i => !i.Finalizado && i.Origem == DownloadYoutube.UrlCanonica(id)))
+                throw new ArgumentException("Este vídeo já está na fila.");
+            var item = _fila.Adicionar(_youtube.CriarItem(url, categoria));
+            return new { item.Id };
+        });
+
+        _bridge.Registrar("ytdlp.versao", async _ => (object?)new { versao = await DownloadYoutube.VersaoAsync(CancellationToken.None) });
+        _bridge.Registrar("ytdlp.atualizar", async _ =>
+        {
+            if (_fila.Itens.Any(i => i.Tipo == "youtube" && !i.Finalizado))
+                throw new InvalidOperationException("Aguarde os downloads da fila terminarem para atualizar o yt-dlp.");
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            return (object?)new { mensagem = await DownloadYoutube.AtualizarAsync(cts.Token) };
+        });
+
+        _bridge.Registrar("fila.listar", _ => _fila.Itens);
+        _bridge.Registrar("fila.cancelar", d => { _fila.Cancelar(Bridge.Texto(d, "id")); return (object?)null; });
+        _bridge.Registrar("fila.remover", d => { _fila.Remover(Bridge.Texto(d, "id")); return (object?)null; });
+        _bridge.Registrar("fila.limparFinalizados", _ => { _fila.LimparFinalizados(); return (object?)null; });
+
+        _bridge.Registrar("app.sair", async _ =>
+        {
+            _saindo = true;
+            _fila.CancelarTodos();
+            await _fila.AguardarOciosaAsync(TimeSpan.FromSeconds(8));
+            RunOnUi(Close);
+            return (object?)null;
+        });
+
         // Diagnóstico (página ui/diagnostico.html)
         _bridge.Registrar("teste.listarVideos", _ => ListarVideosTeste());
         _bridge.Registrar("teste.arquivoTravado", async d => await ArquivoTravadoAsync(Bridge.Texto(d, "caminho")));
@@ -107,6 +217,7 @@ internal sealed class MainForm : Form
         i.Meta.Descricao,
         i.Meta.Categoria,
         i.Meta.Origem,
+        i.Meta.UrlOrigem,
         i.Meta.DuracaoSegundos,
         i.Meta.DataPublicacao,
         i.Meta.DataAdicionado,

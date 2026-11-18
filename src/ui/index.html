@@ -13,29 +13,32 @@
 <body class="min-h-screen">
   <a href="#app" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 btn">Pular para o conteúdo</a>
 
-  <header class="sticky top-0 z-30 border-b border-borda bg-fundo/85 backdrop-blur-md">
-    <div class="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-4 sm:px-6">
-      <a href="#/" class="mr-2 shrink-0 font-display text-2xl font-extrabold tracking-tight" aria-label="MiniFlix — início">
+  <header class="barra-topo sticky top-0 z-30">
+    <div class="mx-auto flex h-[4.5rem] max-w-[1600px] items-center gap-4 px-4 sm:px-6">
+      <a href="#/" class="mr-1 shrink-0 font-display text-2xl font-extrabold tracking-tight" aria-label="MiniFlix — início">
         Mini<span class="text-destaque">Flix</span>
       </a>
 
-      <div id="filtros" class="flex min-w-0 flex-1 items-center gap-2">
+      <div id="filtros" class="flex min-w-0 flex-1 items-center gap-3">
         <label class="relative min-w-0 flex-1 sm:max-w-md">
           <span class="sr-only">Buscar por título</span>
-          <span id="icone-busca" class="pointer-events-none absolute left-3 top-1/2 flex -translate-y-1/2 text-suave"></span>
-          <input id="busca" type="search" class="campo w-full pl-10" placeholder="Buscar por título…  ( / )" autocomplete="off" spellcheck="false">
+          <span class="icone pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[18px] text-suave" aria-hidden="true">search</span>
+          <input id="busca" type="search" class="campo w-full pl-11" placeholder="Buscar por título…  ( / )" autocomplete="off" spellcheck="false">
         </label>
-        <label class="shrink-0">
+        <label class="relative shrink-0">
           <span class="sr-only">Filtrar por categoria</span>
-          <select id="categoria" class="campo max-w-48 pr-8">
+          <select id="categoria" class="campo campo-select max-w-52">
             <option value="">Todas as categorias</option>
           </select>
+          <span class="icone campo-seta" aria-hidden="true">expand_more</span>
         </label>
       </div>
 
-      <div class="ml-auto flex shrink-0 items-center gap-1">
-        <button id="btn-tema" type="button" class="btn-icone"></button>
-        <a id="btn-admin" href="#/admin" class="btn-icone" aria-label="Área administrativa" title="Área administrativa"></a>
+      <div class="ml-auto flex shrink-0 items-center gap-3">
+        <button id="btn-tema" type="button" class="btn-icone btn-icone-elevado"></button>
+        <a id="btn-admin" href="#/admin" class="btn-icone btn-icone-elevado" aria-label="Área administrativa" title="Área administrativa">
+          <span class="icone" aria-hidden="true">settings</span>
+        </a>
       </div>
     </div>
   </header>

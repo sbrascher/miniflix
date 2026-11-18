@@ -1,5 +1,6 @@
 import { h, normalizar, fmtDuracao, matiz, plural } from './util.js';
 import { icone } from './icones.js';
+import { obterProgresso, emAndamento, fracao, listaContinuar } from './progresso.js';
 
 /** Filtra por categoria e por todos os termos da busca (sem acento/caixa) no título. */
 export function filtrar(videos, { busca = '', categoria = '' }) {
@@ -22,15 +23,29 @@ export function imagemCapa(v, tamanhoIcone) {
   return img;
 }
 
-export function cardVideo(v, { mostrarCategoria = false } = {}) {
+export function cardVideo(v, { mostrarCategoria = false, mostrarRestante = false } = {}) {
   const duracao = fmtDuracao(v.duracaoSegundos);
+  const p = obterProgresso(v.slug);
+  const andamento = emAndamento(p);
+  const pct = Math.round(fracao(p) * 100);
+
   return h('a', { href: `#/video/${encodeURIComponent(v.slug)}`, class: 'card-video', title: v.titulo },
     h('div', { class: 'card-video-capa' },
       imagemCapa(v),
+      p?.assistido && !andamento
+        ? h('span', { class: 'selo-assistido' }, icone('check_circle', 14, true), 'Assistido') : null,
       duracao ? h('span', { class: 'selo-duracao' }, h('span', { class: 'sr-only' }, 'Duração: '), duracao) : null,
+      andamento
+        ? h('div', { class: 'card-video-progresso', role: 'img', 'aria-label': `${pct}% assistido` },
+            h('span', { style: { width: `${pct}%` } }))
+        : null,
       h('div', { class: 'card-video-acao', 'aria-hidden': 'true' },
-        h('span', { class: 'btn-primario rounded-full px-5' }, icone('play_arrow', 18, true), 'Assistir'))),
+        h('span', { class: 'btn-primario rounded-full px-5' },
+          icone('play_arrow', 18, true), andamento ? 'Continuar' : 'Assistir'))),
     h('h3', { class: 'card-video-titulo' }, v.titulo),
+    mostrarRestante && andamento
+      ? h('p', { class: 'card-video-restante' }, `Faltam ${fmtDuracao(p.duracao - p.posicao)}`)
+      : null,
     mostrarCategoria ? h('p', { class: 'mx-1.5 mt-1 text-xs text-suave' }, v.categoria) : null,
   );
 }
@@ -40,12 +55,12 @@ const grade = (filhos) => h('div', {
   class: 'grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
 }, filhos);
 
-function secao(titulo, videos, idx) {
-  const id = `secao-${idx}`;
+function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard } = {}) {
   return h('section', { class: 'mb-14', 'aria-labelledby': id },
     h('h2', { id, class: 'mb-5 flex items-center gap-3 font-display text-xl font-bold' },
+      nomeIcone ? h('span', { class: 'flex text-destaque' }, icone(nomeIcone, 24)) : null,
       titulo, h('span', { class: 'chip font-medium text-suave' }, plural(videos.length, 'vídeo', 'vídeos'))),
-    grade(videos.map((v) => cardVideo(v))));
+    grade(videos.map((v) => cardVideo(v, opcoesCard))));
 }
 
 function estadoVazio(icon, titulo, texto, acao) {
@@ -78,11 +93,17 @@ export function renderCatalogo(raiz, { videos, categorias, busca, categoria }) {
       ? grade(filtrados.map((v) => cardVideo(v, { mostrarCategoria: !categoria })))
       : estadoVazio('search_off', 'Nada encontrado', 'Tente outras palavras ou limpe o filtro de categoria.'));
   } else {
+    // "Continuar assistindo" só na visão geral (sem filtro de categoria).
+    const continuar = categoria ? [] : listaContinuar(videos);
+    if (continuar.length) {
+      conteudo.append(secao('Continuar assistindo', continuar, 'secao-continuar',
+        { icone: 'history', opcoesCard: { mostrarRestante: true } }));
+    }
     categorias
       .filter((c) => !categoria || c === categoria)
       .forEach((c, i) => {
         const lista = filtrados.filter((v) => v.categoria === c);
-        if (lista.length) conteudo.append(secao(c, lista, i));
+        if (lista.length) conteudo.append(secao(c, lista, `secao-${i}`));
       });
   }
 

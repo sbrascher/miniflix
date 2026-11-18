@@ -508,6 +508,44 @@
   }
   .card-video:hover .card-video-titulo { color: var(--destaque); }
 
+  /* Progresso de "continuar assistindo" sobre a capa. */
+  .card-video-progresso {
+    position: absolute;
+    left: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.55rem;
+    height: 0.3rem;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 0.55);
+    overflow: hidden;
+  }
+  .card-video-progresso > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--marca-topo), #ff9a6b);
+  }
+  /* Com barra de progresso, o selo de duração sobe um pouco. */
+  .card-video-capa:has(.card-video-progresso) .selo-duracao { bottom: 1.2rem; }
+
+  .selo-assistido {
+    position: absolute;
+    left: 0.5rem;
+    top: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem 0.15rem 0.35rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgb(18 20 24 / 0.78);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  }
+
+  .card-video-restante { margin: 0.25rem 0.3rem 0; font-size: 0.75rem; color: var(--suave); }
+
   /* Coluna do player: largura limitada pela altura da janela (16:9) para o título
      ficar visível sem rolar, e alinhado com o vídeo. */
   .coluna-player {
@@ -529,6 +567,80 @@
     border-radius: calc(var(--raio-xl) - 0.45rem);
     background: #000;
     box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6), inset 0 2px 10px rgb(0 0 0 / 0.6);
+  }
+
+  .moldura-player > .tela { position: relative; }
+  .moldura-player > .tela video { display: block; width: 100%; height: 100%; object-fit: contain; }
+  /* Tela cheia no contêiner (não só no <video>) para os avisos continuarem visíveis. */
+  .tela:fullscreen { aspect-ratio: auto; border-radius: 0; box-shadow: none; }
+
+  /* Aviso rápido sobre o vídeo ao usar um atalho ("+10 s", "Volume 70%"). */
+  .osd {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border-radius: var(--raio-md);
+    font-size: 1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    background: rgb(15 16 20 / 0.72);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.08);
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+  }
+  .osd.visivel { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  /* "Continuando de 3:12 · Começar do início" */
+  .aviso-retomar {
+    position: absolute;
+    left: 1rem;
+    top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.45rem 0.45rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fff;
+    background: rgb(15 16 20 / 0.75);
+    box-shadow: 0 6px 18px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.08);
+    animation: entrar 200ms var(--ease);
+    transition: opacity 300ms var(--ease);
+  }
+  .aviso-retomar button {
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22);
+    cursor: pointer;
+  }
+  .aviso-retomar button:active { box-shadow: inset 1px 2px 4px rgb(0 0 0 / 0.35); }
+
+  /* Tecla "emborrachada" (ajuda de atalhos). */
+  .tecla {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.55rem;
+    border-radius: 0.55rem;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--texto);
+    background: var(--superficie-2);
+    box-shadow: var(--relevo-1), inset 0 -2px 0 color-mix(in srgb, var(--sombra) 60%, transparent);
   }
 
   /* ---------- Tabela do acervo ---------- */
@@ -610,7 +722,8 @@
    some. Bordas reais garantem que botões, campos e cards continuem visíveis. */
 @media (forced-colors: active) {
   .painel, .bandeja, .pastilha, .btn, .btn-primario, .btn-perigo, .btn-icone-elevado,
-  .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho {
+  .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho,
+  .tecla, .osd, .aviso-retomar {
     border: 1px solid CanvasText;
   }
   .trilho-preenchimento { background: Highlight; }

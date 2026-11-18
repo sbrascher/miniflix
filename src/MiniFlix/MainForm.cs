@@ -15,6 +15,7 @@ internal sealed class MainForm : Form
     private readonly CatalogService _catalogo;
     private readonly SettingsService _config;
     private readonly FilaService _fila = new();
+    private readonly ProgressService _progresso = new(Path.Combine(AppPaths.Data, "progress.json"));
     private readonly ImportacaoLocal _importacao;
     private readonly DownloadYoutube _youtube;
     // Arquivos escolhidos no diálogo nativo. A UI só recebe um token: não pode pedir para importar caminhos arbitrários.
@@ -43,6 +44,8 @@ internal sealed class MainForm : Form
         _youtube = new DownloadYoutube(_catalogo);
         _fila.Alterada += itens => _bridge.Emitir("fila.atualizada", itens);
         RegistrarComandos();
+
+        FormClosed += (_, _) => _progresso.Dispose(); // grava posições pendentes
 
         // Fechar com a fila trabalhando: a UI pergunta (modal próprio) e responde com "app.sair".
         FormClosing += (_, e) =>
@@ -97,7 +100,32 @@ internal sealed class MainForm : Form
         });
         _bridge.Registrar("video.excluir", async d =>
         {
-            await _catalogo.ExcluirAsync(Bridge.Texto(d, "slug"));
+            var slug = Bridge.Texto(d, "slug");
+            var chave = _catalogo.Obter(slug) is { } item ? ChaveProgresso(item) : null;
+            await _catalogo.ExcluirAsync(slug);
+            if (chave is not null) _progresso.Remover(chave);
+            return (object?)null;
+        });
+
+        // ---- Continuar assistindo ----
+        _bridge.Registrar("progresso.listar", _ =>
+        {
+            var mapa = new Dictionary<string, ProgressoVideo>();
+            foreach (var item in _catalogo.Itens)
+                if (_progresso.Obter(ChaveProgresso(item)) is { } p) mapa[item.Meta.Slug] = p;
+            return mapa;
+        });
+        _bridge.Registrar("progresso.salvar", d =>
+        {
+            var item = _catalogo.Obter(Bridge.Texto(d, "slug")) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+            var posicao = d?["posicao"]?.GetValue<double>() ?? throw new ArgumentException("Parâmetro 'posicao' ausente.");
+            var duracao = d?["duracao"]?.GetValue<double>() ?? throw new ArgumentException("Parâmetro 'duracao' ausente.");
+            return _progresso.Registrar(ChaveProgresso(item), posicao, duracao);
+        });
+        _bridge.Registrar("progresso.reiniciar", d =>
+        {
+            var item = _catalogo.Obter(Bridge.Texto(d, "slug")) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+            _progresso.Reiniciar(ChaveProgresso(item));
             return (object?)null;
         });
         _bridge.Registrar("video.obter", d =>
@@ -210,6 +238,8 @@ internal sealed class MainForm : Form
         });
     }
 
+    private static string ChaveProgresso(VideoItem i) => ProgressService.Chave(i.Meta.Id, i.Meta.Slug);
+
     private static object ParaUi(VideoItem i) => new
     {
         i.Meta.Slug,
@@ -289,6 +319,26 @@ internal sealed class MainForm : Form
             OpenExternal(e.Uri);
         };
         core.WebMessageReceived += async (_, e) => await _bridge.ProcessarAsync(e.WebMessageAsJson);
+
+        // Tela cheia de verdade: sem isso, o elemento só ocupa a área do WebView dentro da janela.
+        FormBorderStyle bordaAnterior = FormBorderStyle;
+        FormWindowState estadoAnterior = WindowState;
+        core.ContainsFullScreenElementChanged += (_, _) =>
+        {
+            if (core.ContainsFullScreenElement)
+            {
+                bordaAnterior = FormBorderStyle;
+                estadoAnterior = WindowState;
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Normal;     // necessário para o Maximized cobrir a barra de tarefas
+                WindowState = FormWindowState.Maximized;
+            }
+            else
+            {
+                FormBorderStyle = bordaAnterior;
+                WindowState = estadoAnterior;
+            }
+        };
 
         _catalogo.Iniciar();
 

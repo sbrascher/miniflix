@@ -2,7 +2,7 @@
 
 **Seu catálogo de vídeos offline, no pendrive.** O MiniFlix é um "mini streaming" para Windows que roda direto de qualquer pasta ou pendrive. Você baixa ou importa vídeos uma vez e depois assiste sem internet, em qualquer PC, sem instalar nada e sem deixar rastros no computador.
 
-> 🚧 **Status: em desenvolvimento.** Catálogo, administração, importação de arquivos e download do YouTube já funcionam. Faltam o player completo (atalhos e "continuar assistindo") e o polimento visual. Veja o [roadmap](#roadmap).
+> 🚧 **Status: quase lá.** Catálogo, player completo, administração, importação de arquivos e download do YouTube já funcionam. Falta o empacotamento final para pendrive. Veja o [roadmap](#roadmap).
 
 ---
 
@@ -99,7 +99,7 @@ Sem `vendor\bin\webview2`, o app usa o WebView2 instalado no Windows.
 
 - [x] **1. Protótipo técnico:** WebView2 portátil, host virtual, seek em vídeo de mais de 1 GB, liberação de arquivo.
 - [x] **2. Catálogo:** leitura de `/videos`, cache, busca, filtro por categoria, tema claro/escuro e player básico.
-- [ ] 3. Player: atalhos e "continuar assistindo".
+- [x] **3. Player:** atalhos de teclado no estilo do YouTube (tecla `?` mostra a lista), "continuar assistindo" com retomada automática, selo de assistido, tela cheia e volume lembrado.
 - [x] **4. Importação de vídeos locais:** vários arquivos de uma vez, cópia sem reconversão quando possível, capa automática, fila com progresso e cancelamento.
 - [x] **5. Download do YouTube:** até 1080p, H.264/AAC, capa e descrição do vídeo, mensagens de erro claras e botão para atualizar o yt-dlp.
 - [x] **6. Gerenciamento do acervo:** listagem com filtro, editar título/categoria/descrição e excluir com confirmação.

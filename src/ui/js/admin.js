@@ -6,6 +6,7 @@ import { cardImportar } from './importar.js';
 import { cardYoutube } from './youtube.js';
 import { criarPainelFila } from './fila.js';
 import { imagemCapa } from './catalogo.js';
+import { esquecerProgresso } from './progresso.js';
 
 let filtro = ''; // preservado entre re-renderizações
 
@@ -189,6 +190,7 @@ async function excluir(v) {
   if (!ok) return;
   try {
     await bridge.call('video.excluir', { slug: v.slug });
+    esquecerProgresso(v.slug);
     toast('Vídeo excluído.');
   } catch (e) {
     toast(e.message, 'erro');

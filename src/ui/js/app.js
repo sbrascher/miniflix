@@ -6,6 +6,7 @@ import { renderPlayer } from './player.js';
 import { renderAdmin } from './admin.js';
 import { atualizarFila } from './fila.js';
 import { confirmar, toast } from './componentes.js';
+import { carregarProgresso } from './progresso.js';
 
 const $ = (s) => document.querySelector(s);
 const raiz = $('#app');
@@ -76,7 +77,7 @@ function irParaCatalogoSeNecessario() {
 document.addEventListener('keydown', (e) => {
   const alvo = e.target;
   const digitando = alvo instanceof HTMLElement && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName));
-  if (e.key === '/' && !digitando && !e.ctrlKey && !e.altKey) {
+  if (e.key === '/' && !digitando && !e.ctrlKey && !e.altKey && rotaAtual().nome === 'catalogo') {
     e.preventDefault();
     campoBusca.focus();
     campoBusca.select();
@@ -84,7 +85,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 bridge.on('catalogo.atualizado', async () => {
-  await carregarCatalogo();
+  await Promise.all([carregarCatalogo(), carregarProgresso()]);
   atualizarTelaAtual();
 });
 
@@ -168,7 +169,7 @@ aplicarTema(estado.tema);
   try {
     const cfg = await bridge.call('config.obter');
     aplicarTema(cfg.tema);
-    await carregarCatalogo();
+    await Promise.all([carregarCatalogo(), carregarProgresso()]);
     aoMudarFila(await bridge.call('fila.listar'));
     navegar();
   } catch (e) {

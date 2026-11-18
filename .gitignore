@@ -1,0 +1,18 @@
+# Build
+bin/
+obj/
+dist/
+*.user
+
+# Binários de terceiros (yt-dlp, ffmpeg, deno, WebView2 Fixed Runtime)
+vendor/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Dados gerados em tempo de execução
+data/
+videos/
+*.mp4

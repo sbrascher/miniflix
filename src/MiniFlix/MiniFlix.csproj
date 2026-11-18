@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MiniFlix</AssemblyName>
+    <RootNamespace>MiniFlix</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Version>0.1.0</Version>
+    <!-- Portátil: sem single-file para não extrair DLLs nativas em %TEMP% -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SatelliteResourceLanguages>pt-BR</SatelliteResourceLanguages>
+    <!-- O pacote WebView2 também referencia a DLL de WPF; o conflito de WindowsBase é inofensivo em WinForms. -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);MSB3277</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
+  <!-- Frontend (src/ui) copiado para a pasta /ui ao lado do .exe -->
+  <ItemGroup>
+    <Content Include="..\ui\**\*" Link="ui\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

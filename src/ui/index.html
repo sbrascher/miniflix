@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniFlix — Protótipo</title>
+  <link rel="stylesheet" href="prototipo.css">
+</head>
+<body>
+  <header>
+    <h1>MiniFlix <span class="tag">protótipo de riscos</span></h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. Ambiente</h2>
+      <dl id="info"><dt>Carregando…</dt></dl>
+      <p id="aviso-fs" class="aviso" hidden></p>
+    </section>
+
+    <section class="card">
+      <h2>2. Ponte JS ↔ C#</h2>
+      <p>Ida e volta (média de 20 pings): <strong id="ping">—</strong></p>
+    </section>
+
+    <section class="card wide">
+      <h2>3. Reprodução e seek</h2>
+      <div class="linha">
+        <label for="lista">Vídeo:</label>
+        <select id="lista"></select>
+        <button id="btn-carregar">Carregar</button>
+      </div>
+      <p id="sem-videos" class="aviso" hidden>
+        Nenhum .mp4 em <code>/videos</code>. Rode <code>tools\gerar-video-teste.ps1</code> ou copie um vídeo para
+        <code>videos\teste\</code>.
+      </p>
+      <video id="player" controls preload="metadata"></video>
+      <div class="linha">
+        <button id="btn-range">Testar Range (206)</button>
+        <button id="btn-seek">Testar seek automático</button>
+        <button id="btn-liberar">Testar liberação do arquivo</button>
+      </div>
+      <table id="resultados">
+        <thead><tr><th>Teste</th><th>Resultado</th><th>Detalhe</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

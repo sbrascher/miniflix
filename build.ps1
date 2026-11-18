@@ -48,6 +48,16 @@ if (Test-Path $vendorBin) {
 
 foreach ($d in 'videos', 'data') { New-Item -ItemType Directory -Force (Join-Path $dist $d) | Out-Null }
 
+# README.txt para o usuário final (versão do .csproj + data), em UTF-8 com BOM e CRLF (Bloco de Notas).
+$versao = ([xml](Get-Content (Join-Path $raiz 'src\MiniFlix\MiniFlix.csproj'))).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+$leiame = [IO.File]::ReadAllText((Join-Path $raiz 'pacote\README.txt'))
+$leiame = $leiame.Replace('{{VERSAO}}', $versao).Replace('{{DATA}}', (Get-Date -Format 'dd/MM/yyyy'))
+$leiame = $leiame -replace "`r?`n", "`r`n"
+[IO.File]::WriteAllText((Join-Path $dist 'README.txt'), $leiame, (New-Object System.Text.UTF8Encoding($true)))
+if (-not (Test-Path (Join-Path $dist 'bin\licencas'))) {
+  Write-Warning 'bin\licencas não encontrado: rode .\tools\baixar-dependencias.ps1 -SoLicencas antes de distribuir.'
+}
+
 if ($VideoTeste)  { & (Join-Path $raiz 'tools\gerar-video-teste.ps1') -Raiz $dist }
 if ($AcervoTeste) { & (Join-Path $raiz 'tools\gerar-acervo-teste.ps1') -Raiz $dist }
 

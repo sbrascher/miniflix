@@ -84,6 +84,8 @@ Para gerar uma versão totalmente portátil, os binários de terceiros ficam em 
 
 Sem `vendor\bin\webview2`, o app usa o WebView2 instalado no Windows.
 
+As licenças dos componentes de terceiros vão para `bin\licencas`; o FFmpeg é GPL, então o texto da licença precisa acompanhar os binários. O manual do usuário final (`README.txt` da pasta portátil) é gerado pelo `build.ps1` a partir de [`pacote/README.txt`](pacote/README.txt), com a versão e a data preenchidas.
+
 ### Modos de diagnóstico
 
 ```powershell

@@ -1,0 +1,183 @@
+==========================================================================
+  MiniFlix {{VERSAO}}  -  seu catálogo de vídeos offline, no pendrive
+==========================================================================
+
+O MiniFlix é um "mini streaming" que roda direto desta pasta, sem
+instalar nada. Você adiciona os vídeos uma vez e depois assiste sem
+internet, em qualquer computador com Windows 10 ou 11 (64 bits).
+
+Nada é gravado fora desta pasta: nem no Registro do Windows, nem em
+AppData. Ao remover o pendrive, nenhum rastro fica no computador.
+
+
+--------------------------------------------------------------------------
+ 1. COMO ABRIR
+--------------------------------------------------------------------------
+
+  Dê dois cliques em  MiniFlix.exe
+
+  Na primeira vez, o Windows pode mostrar "O Windows protegeu o
+  computador" (SmartScreen). Isso acontece com programas que não são
+  instalados pela loja. Clique em "Mais informações" e depois em
+  "Executar assim mesmo".
+
+
+--------------------------------------------------------------------------
+ 2. ADICIONAR VÍDEOS
+--------------------------------------------------------------------------
+
+  Clique na engrenagem (canto superior direito) para abrir a
+  Administração.
+
+  IMPORTAR DO COMPUTADOR (funciona sem internet)
+    1. Clique em "Escolher arquivos..." e selecione um ou mais vídeos.
+    2. Ajuste os títulos e escolha (ou digite) uma categoria.
+    3. Clique em "Adicionar à fila".
+    Vídeos já em MP4 são apenas copiados. Outros formatos (AVI, MKV,
+    WMV, WebM...) são convertidos para MP4, o que pode levar alguns
+    minutos. O arquivo original nunca é alterado.
+
+  BAIXAR DO YOUTUBE (precisa de internet)
+    1. Cole o link do vídeo no campo "Link do vídeo".
+    2. Escolha a categoria e clique em "Baixar".
+    O vídeo é salvo em até 1080p, com capa e descrição.
+
+  A FILA
+    Os vídeos são processados um por vez. A fila mostra o progresso e
+    permite cancelar. Você pode continuar usando o MiniFlix enquanto
+    ela trabalha; um ponto pulsante na engrenagem avisa que há algo em
+    andamento.
+
+
+--------------------------------------------------------------------------
+ 3. ASSISTIR
+--------------------------------------------------------------------------
+
+  Clique em qualquer capa. Use a busca (tecla / ) e o filtro de
+  categoria no topo para encontrar vídeos.
+
+  CONTINUAR ASSISTINDO
+    O MiniFlix lembra onde você parou em cada vídeo. Os vídeos
+    começados aparecem na fileira "Continuar assistindo" e voltam
+    exatamente do ponto em que você parou. Vídeos vistos até o fim
+    ganham o selo "Assistido".
+
+  ATALHOS DO TECLADO (dentro do player)
+    Espaço ou K ........ reproduzir / pausar
+    Setas  <-  -> ...... voltar / avançar 5 segundos
+    J  /  L ............ voltar / avançar 10 segundos
+    Setas  cima/baixo .. volume
+    M .................. tirar / devolver o som
+    F .................. tela cheia
+    <  /  > ............ diminuir / aumentar a velocidade
+    0 a 9 .............. pular para 0% ... 90% do vídeo
+    Esc ................ sair da tela cheia / voltar ao catálogo
+    ? .................. mostrar a lista de atalhos
+
+  TEMA
+    O botão de sol/lua no topo alterna entre o tema claro e o escuro.
+
+
+--------------------------------------------------------------------------
+ 4. GERENCIAR O ACERVO
+--------------------------------------------------------------------------
+
+  Na Administração, a tabela "Acervo" lista todos os vídeos. Ali você
+  pode assistir, editar (título, categoria e descrição) ou excluir.
+  A exclusão apaga o vídeo do disco e não pode ser desfeita.
+
+
+--------------------------------------------------------------------------
+ 5. DICAS PARA O PENDRIVE
+--------------------------------------------------------------------------
+
+  * Formate o pendrive em exFAT (ou NTFS). O formato FAT32 não aceita
+    arquivos com mais de 4 GB, o que impede vídeos longos.
+    Atenção: formatar apaga tudo o que estiver no pendrive.
+
+  * Feche o MiniFlix antes de remover o pendrive.
+
+  * Pendrives USB 3.0 deixam a abertura e a conversão bem mais rápidas.
+
+  * Para fazer backup ou levar o acervo para outro pendrive, copie a
+    pasta inteira do MiniFlix. Cada vídeo fica numa pasta própria
+    dentro de "videos", com o vídeo (.mp4), a capa (.jpg) e os
+    dados (.json).
+
+
+--------------------------------------------------------------------------
+ 6. O QUE HÁ NESTA PASTA
+--------------------------------------------------------------------------
+
+  MiniFlix.exe ... o programa
+  videos\ ........ seus vídeos (uma pasta por vídeo)
+  data\ .......... configurações, posição de cada vídeo e registros
+  bin\ ........... ferramentas usadas pelo MiniFlix (yt-dlp, ffmpeg,
+                   deno e, se presente, o componente WebView2)
+  ui\ ............ a interface do programa
+  (demais arquivos .dll e .json: partes do programa - não apague)
+
+
+--------------------------------------------------------------------------
+ 7. PROBLEMAS COMUNS
+--------------------------------------------------------------------------
+
+  "Não foi encontrado o componente WebView2"
+    O computador não tem o WebView2 (o motor do Microsoft Edge que o
+    MiniFlix usa) e esta cópia não trouxe o seu próprio. Instale o
+    "Microsoft Edge WebView2 Runtime" pelo site da Microsoft, ou use
+    uma cópia do MiniFlix que tenha a pasta bin\webview2.
+
+  O YouTube parou de baixar ("pediu uma verificação", "falha no
+  download")
+    O YouTube muda com frequência. Na Administração, clique em
+    "Atualizar yt-dlp" (precisa de internet) e tente de novo.
+    Vídeos privados, com restrição de idade ou transmissões ao vivo
+    não podem ser baixados.
+
+  Um vídeo importado não aparece
+    Veja a fila na Administração: se houve erro, a mensagem explica o
+    motivo. Se você copiou pastas de vídeo manualmente para "videos",
+    clique em "Recarregar pasta".
+
+  Não consigo excluir um vídeo ("está em uso")
+    Feche o vídeo (volte ao catálogo) e tente novamente.
+
+  Para qualquer outro problema, o arquivo data\logs\miniflix.log tem
+  os detalhes técnicos do que aconteceu.
+
+
+--------------------------------------------------------------------------
+ 8. PRIVACIDADE E USO RESPONSÁVEL
+--------------------------------------------------------------------------
+
+  O MiniFlix só acessa a internet quando você baixa um vídeo do
+  YouTube ou atualiza o yt-dlp. Nenhum dado é enviado a terceiros.
+
+  Baixe apenas conteúdo seu, licenciado ou com permissão do autor,
+  respeitando os termos de uso do YouTube e os direitos autorais.
+  O MiniFlix não tem vínculo com o YouTube nem com serviços de
+  streaming.
+
+
+--------------------------------------------------------------------------
+ 9. CRÉDITOS E LICENÇAS
+--------------------------------------------------------------------------
+
+  MiniFlix ............ https://github.com/sbrascher/miniflix
+
+  Componentes de terceiros incluídos na pasta bin:
+    FFmpeg ............ GPL v3 - https://ffmpeg.org
+                        (compilação: https://github.com/BtbN/FFmpeg-Builds,
+                        código-fonte disponível nesse endereço;
+                        texto da licença em bin\licencas)
+    yt-dlp ............ Unlicense - https://github.com/yt-dlp/yt-dlp
+    Deno .............. MIT - https://deno.com
+    Microsoft Edge
+    WebView2 Runtime .. licença Microsoft - https://developer.microsoft.com/microsoft-edge/webview2/
+
+  Também usa:
+    .NET .............. MIT - https://dotnet.microsoft.com
+    Material Symbols .. Apache 2.0 - https://fonts.google.com/icons
+
+  Versão {{VERSAO}} - gerada em {{DATA}}

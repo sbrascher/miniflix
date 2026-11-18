@@ -72,12 +72,15 @@ O CSS compilado (`src\ui\css\app.css`) é versionado, então o Tailwind só é n
 Para gerar uma versão totalmente portátil, os binários de terceiros ficam em `vendor\bin\`. A pasta não é versionada; o `build.ps1` a copia para `dist\MiniFlix\bin\`. O script abaixo baixa o yt-dlp, o Deno e o ffmpeg (cerca de 310 MB):
 
 ```powershell
-.\tools\baixar-dependencias.ps1
+.\tools\baixar-dependencias.ps1 -WebView2   # yt-dlp, Deno, ffmpeg, licenças e WebView2 Fixed Runtime
+.\tools\baixar-dependencias.ps1 -SoWebView2 # só (re)baixa o WebView2
 ```
+
+O WebView2 Fixed Runtime não tem link estável. O script lê a página oficial com o Edge em modo headless, baixa o `.cab` x64 mais recente do domínio de downloads da Microsoft, **confere a assinatura digital da Microsoft** e o extrai em `vendor\bin\webview2`, mantendo só os idiomas pt-BR e en-US (cerca de 546 MB). Para manter todos os idiomas, use `-ManterTodosIdiomas`.
 
 | Arquivo | Onde obter |
 |---|---|
-| `webview2\` | [WebView2 Fixed Version Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (x64, extraído) |
+| `webview2\` | [WebView2 Fixed Version Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (x64, baixado pelo script com `-WebView2`) |
 | `yt-dlp.exe` | [github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) |
 | `ffmpeg.exe`, `ffprobe.exe` + DLLs | [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds/releases) (build *gpl-shared*) |
 | `deno.exe` | [deno.com](https://deno.com/) (runtime JS exigido pelo yt-dlp para o YouTube) |

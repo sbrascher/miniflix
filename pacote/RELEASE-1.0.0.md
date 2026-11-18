@@ -39,6 +39,7 @@ O arquivo `README.txt` dentro da pasta tem o guia completo: atalhos, dicas para 
 
 **Gerenciar**
 - Editar título, categoria e descrição; excluir vídeos (com confirmação).
+- **Trocar a capa** por uma imagem do computador ou por qualquer cena do vídeo, escolhida num controle deslizante com prévia ao vivo.
 - Botão **"Atualizar yt-dlp"** para quando o YouTube mudar algo e os downloads pararem.
 
 **Portátil de verdade**

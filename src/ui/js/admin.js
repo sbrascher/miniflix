@@ -7,6 +7,7 @@ import { cardYoutube } from './youtube.js';
 import { criarPainelFila } from './fila.js';
 import { imagemCapa } from './catalogo.js';
 import { esquecerProgresso } from './progresso.js';
+import { secaoCapa } from './capa.js';
 
 let filtro = ''; // preservado entre re-renderizações
 
@@ -128,12 +129,14 @@ async function editar(v, estado) {
     id: 'ed-categoria', class: 'campo w-full', maxlength: 60, list: 'ed-categorias', autocomplete: 'off',
     value: v.categoria === 'Sem categoria' ? '' : v.categoria, placeholder: 'Sem categoria',
   });
-  const descricao = h('textarea', { id: 'ed-descricao', class: 'campo w-full', rows: 6, maxlength: 10000 });
+  const descricao = h('textarea', { id: 'ed-descricao', class: 'campo w-full', rows: 4, maxlength: 10000 });
+  const capa = secaoCapa(v);
   descricao.value = v.descricao ?? '';
 
   const salvar = h('button', { type: 'submit', form: 'form-editar', class: 'btn-primario' }, 'Salvar alterações');
 
   const form = h('form', { id: 'form-editar', class: 'space-y-5', novalidate: true },
+    capa.el,
     h('div', {}, h('label', { for: 'ed-titulo', class: 'rotulo' }, 'Título'), titulo),
     h('div', {},
       h('label', { for: 'ed-categoria', class: 'rotulo' }, 'Categoria'),
@@ -146,7 +149,7 @@ async function editar(v, estado) {
 
   const salvo = abrirModal({
     titulo: 'Editar vídeo',
-    largura: 'max-w-xl',
+    largura: 'max-w-2xl',
     corpo: form,
     acoes: (fechar) => {
       form.addEventListener('submit', async (e) => {
@@ -165,6 +168,7 @@ async function editar(v, estado) {
           await bridge.call('video.editar', {
             slug: v.slug, titulo: titulo.value, categoria: categoria.value, descricao: descricao.value,
           });
+          await capa.confirmar();
           fechar(true);
         } catch (ex) {
           erro.textContent = ex.message;
@@ -177,7 +181,10 @@ async function editar(v, estado) {
   });
   titulo.focus();
   titulo.select();
-  if (await salvo) toast('Alterações salvas.');
+  const ok = await salvo;
+  capa.liberar();                  // solta o arquivo de vídeo usado pelo seletor de quadro
+  if (!ok) await capa.descartar(); // cancelou: a capa atual continua
+  else toast('Alterações salvas.');
 }
 
 async function excluir(v) {

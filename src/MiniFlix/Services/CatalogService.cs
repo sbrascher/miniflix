@@ -166,13 +166,50 @@ public sealed class CatalogService
         Varrer();
     }
 
-    /// <summary>Remove restos de exclusões e importações/downloads interrompidos (app fechado no meio).</summary>
+    /// <summary>Remove restos de exclusões, importações/downloads e prévias de capa interrompidos (app fechado no meio).</summary>
     public void LimparExclusoesPendentes()
     {
         if (!Directory.Exists(_pastaVideos)) return;
         foreach (var prefixo in new[] { PrefixoExclusao, PrefixoTemporario })
             foreach (var d in Directory.EnumerateDirectories(_pastaVideos, prefixo + "*"))
                 ApagarPastaTemporaria(d);
+        foreach (var previa in Directory.EnumerateFiles(_pastaVideos, "*" + SufixoPrevia, SearchOption.AllDirectories))
+            try { File.Delete(previa); } catch (IOException) { }
+    }
+
+    // ---------- Troca de capa ----------
+    // A capa nova é gerada primeiro como prévia (<slug>.previa.jpg, ignorada pela varredura) e só
+    // substitui <slug>.jpg ao confirmar — assim "Cancelar" no modal não perde a capa atual.
+
+    private const string SufixoPrevia = ".previa.jpg";
+
+    /// <summary>Caminho onde a prévia da nova capa deve ser gravada.</summary>
+    public string CaminhoPreviaCapa(string slug) => Path.Combine(PastaDoVideo(slug), slug + SufixoPrevia);
+
+    public string UrlPreviaCapa(string slug)
+    {
+        var previa = new FileInfo(CaminhoPreviaCapa(slug));
+        if (!previa.Exists) throw new InvalidOperationException("A prévia da capa não foi gerada.");
+        return UrlVersionada(previa);
+    }
+
+    public string CaminhoVideo(string slug) => Path.Combine(PastaDoVideo(slug), slug + ".mp4");
+
+    /// <summary>Substitui a capa pela prévia (rename atômico na mesma pasta) e atualiza o catálogo.</summary>
+    public VideoItem ConfirmarCapa(string slug)
+    {
+        var previa = CaminhoPreviaCapa(slug);
+        if (!File.Exists(previa)) throw new InvalidOperationException("Não há uma nova capa para salvar.");
+        File.Move(previa, Path.Combine(PastaDoVideo(slug), slug + ".jpg"), overwrite: true);
+        Log.Info($"Capa alterada: {slug}");
+        Varrer();
+        return Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+    }
+
+    public void DescartarPreviaCapa(string slug)
+    {
+        var previa = CaminhoPreviaCapa(slug);
+        if (File.Exists(previa)) File.Delete(previa);
     }
 
     // ---------- Novos vídeos (importação e download) ----------
@@ -252,9 +289,12 @@ public sealed class CatalogService
         if (string.IsNullOrWhiteSpace(meta.Categoria)) meta.Categoria = SemCategoria;
         meta.Categoria = meta.Categoria.Trim();
 
-        var capa = Path.Combine(pasta, meta.Slug + ".jpg");
-        return new VideoItem(meta, _paraUrl(mp4.FullName), File.Exists(capa) ? _paraUrl(capa) : null, mp4.Length);
+        var capa = new FileInfo(Path.Combine(pasta, meta.Slug + ".jpg"));
+        return new VideoItem(meta, _paraUrl(mp4.FullName), capa.Exists ? UrlVersionada(capa) : null, mp4.Length);
     }
+
+    /// <summary>URL com a data de modificação: quando a capa muda, o navegador não usa a imagem antiga do cache.</summary>
+    private string UrlVersionada(FileInfo arquivo) => $"{_paraUrl(arquivo.FullName)}?v={arquivo.LastWriteTimeUtc.Ticks}";
 
     private static List<VideoItem> Ordenar(List<VideoItem> itens) =>
         itens.OrderByDescending(i => i.Meta.DataAdicionado).ThenBy(i => i.Meta.Slug, StringComparer.Ordinal).ToList();

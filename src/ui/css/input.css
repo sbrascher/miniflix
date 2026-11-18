@@ -348,6 +348,27 @@
   .campo:disabled { opacity: 0.55; cursor: not-allowed; }
   textarea.campo { line-height: 1.6; resize: vertical; }
 
+  /* Controle deslizante: trilho afundado + "botão" emborrachado em relevo. */
+  .deslizante {
+    appearance: none;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: var(--afundado);
+    box-shadow: var(--afundar-leve);
+    cursor: pointer;
+  }
+  .deslizante::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
+    box-shadow: var(--relevo-1), inset 0 1px 0 rgb(255 255 255 / 0.25);
+    transition: transform var(--rapido);
+  }
+  .deslizante:active::-webkit-slider-thumb { transform: scale(1.12); }
+  .deslizante:focus-visible { outline: 2px solid var(--destaque); outline-offset: 4px; }
+
   /* <select> com seta própria (o ícone fica num elemento irmão .campo-seta). */
   .campo-select { appearance: none; padding-right: 2.5rem; cursor: pointer; }
   .campo-seta {
@@ -703,6 +724,8 @@
     margin: auto;
     padding: 0;
     width: calc(100% - 2rem);
+    max-height: calc(100vh - 2rem);   /* conteúdo alto (ex.: seletor de quadro) rola dentro do modal */
+    overflow-y: auto;
     border-radius: var(--raio-xl);
     background: var(--superficie);
     color: var(--texto);
@@ -769,7 +792,7 @@
 @media (forced-colors: active) {
   .painel, .bandeja, .pastilha, .btn, .btn-primario, .btn-perigo, .btn-icone-elevado,
   .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho,
-  .tecla, .osd, .aviso-retomar, .card-remover, .toast-acao {
+  .tecla, .osd, .aviso-retomar, .card-remover, .toast-acao, .deslizante {
     border: 1px solid CanvasText;
   }
   .trilho-preenchimento { background: Highlight; }

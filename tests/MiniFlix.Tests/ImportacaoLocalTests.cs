@@ -138,6 +138,56 @@ public sealed class ImportacaoLocalTests : IDisposable
     }
 
     [Fact]
+    public async Task Capa_de_imagem_png_vira_jpg_de_640px()
+    {
+        if (!TemFfmpeg) return;
+        var png = Path.Combine(Origem, "arte.png");
+        await Processo.ExecutarAsync(Ferramentas.Ffmpeg!, ["-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=1600x900", "-frames:v", "1", png], CancellationToken.None);
+
+        var jpg = Path.Combine(Origem, "capa.jpg");
+        await Ffmpeg.ConverterImagemParaCapaAsync(png, jpg, CancellationToken.None);
+        var info = await Ffmpeg.AnalisarAsync(jpg, CancellationToken.None);
+        Assert.Equal("mjpeg", info.CodecVideo);
+        Assert.Equal(640, info.Largura);
+        Assert.Equal(360, info.Altura);
+    }
+
+    [Fact]
+    public async Task Capa_de_imagem_pequena_nao_e_ampliada()
+    {
+        if (!TemFfmpeg) return;
+        var png = Path.Combine(Origem, "pequena.png");
+        await Processo.ExecutarAsync(Ferramentas.Ffmpeg!, ["-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=320x180", "-frames:v", "1", png], CancellationToken.None);
+        var jpg = Path.Combine(Origem, "capa.jpg");
+        await Ffmpeg.ConverterImagemParaCapaAsync(png, jpg, CancellationToken.None);
+        Assert.Equal(320, (await Ffmpeg.AnalisarAsync(jpg, CancellationToken.None)).Largura);
+    }
+
+    [Fact]
+    public async Task Arquivo_que_nao_e_imagem_gera_erro_amigavel()
+    {
+        if (!TemFfmpeg) return;
+        var falso = Path.Combine(Origem, "falso.png");
+        File.WriteAllText(falso, "não sou uma imagem");
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Ffmpeg.ConverterImagemParaCapaAsync(falso, Path.Combine(Origem, "c.jpg"), CancellationToken.None));
+        Assert.Contains("imagem", ex.Message);
+    }
+
+    [Fact]
+    public async Task Capa_de_quadro_no_instante_escolhido()
+    {
+        if (!TemFfmpeg) return;
+        var mp4 = await GerarVideo("quadro.mp4", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
+        var jpg = Path.Combine(Origem, "quadro.jpg");
+        Assert.True(await Ffmpeg.GerarCapaNoInstanteAsync(mp4, jpg, 2.0, CancellationToken.None));
+        // Quadros de vídeo sempre saem na largura padrão (igual às capas automáticas).
+        Assert.Equal(Ffmpeg.LarguraCapa, (await Ffmpeg.AnalisarAsync(jpg, CancellationToken.None)).Largura);
+    }
+
+    [Fact]
     public async Task Cancelar_durante_conversao_apaga_pasta_temporaria()
     {
         if (!TemFfmpeg) return;

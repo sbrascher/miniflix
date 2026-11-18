@@ -109,6 +109,43 @@ internal sealed class MainForm : Form
             return (object?)null;
         });
 
+        // ---- Troca de capa (prévia → confirmar/descartar) ----
+        _bridge.Registrar("capa.prepararDeImagem", async d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            var destino = _catalogo.CaminhoPreviaCapa(slug); // valida o slug antes de abrir o diálogo
+            string? imagem = Environment.GetEnvironmentVariable("MINIFLIX_TESTE_IMAGEM"); // gancho de teste
+            if (string.IsNullOrEmpty(imagem))
+            {
+                using var dlg = new OpenFileDialog
+                {
+                    Title = "Escolha a imagem de capa",
+                    Filter = "Imagens (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif",
+                    RestoreDirectory = true,
+                };
+                if (dlg.ShowDialog(this) != DialogResult.OK) return null;
+                imagem = dlg.FileName;
+            }
+            await Ffmpeg.ConverterImagemParaCapaAsync(imagem, destino, CancellationToken.None);
+            return (object?)new { url = _catalogo.UrlPreviaCapa(slug) };
+        });
+        _bridge.Registrar("capa.prepararDeQuadro", async d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            var segundos = d?["segundos"]?.GetValue<double>() ?? throw new ArgumentException("Parâmetro 'segundos' ausente.");
+            if (!double.IsFinite(segundos) || segundos < 0) throw new ArgumentException("Instante inválido.");
+            var ok = await Ffmpeg.GerarCapaNoInstanteAsync(_catalogo.CaminhoVideo(slug), _catalogo.CaminhoPreviaCapa(slug),
+                segundos, CancellationToken.None);
+            if (!ok) throw new InvalidOperationException("Não foi possível extrair esse quadro do vídeo.");
+            return (object?)new { url = _catalogo.UrlPreviaCapa(slug) };
+        });
+        _bridge.Registrar("capa.confirmar", async d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            return (object?)ParaUi(await Task.Run(() => _catalogo.ConfirmarCapa(slug)));
+        });
+        _bridge.Registrar("capa.descartar", d => { _catalogo.DescartarPreviaCapa(Bridge.Texto(d, "slug")); return (object?)null; });
+
         // ---- Continuar assistindo ----
         _bridge.Registrar("progresso.listar", _ =>
         {

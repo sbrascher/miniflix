@@ -39,7 +39,7 @@ public sealed class CatalogServiceTests : IDisposable
         var item = Assert.Single(cat.Itens);
         Assert.Equal("Aula 1", item.Meta.Titulo);
         Assert.Equal("url:aula-01.mp4", item.VideoUrl);
-        Assert.Equal("url:aula-01.jpg", item.CapaUrl);
+        Assert.StartsWith("url:aula-01.jpg?v=", item.CapaUrl);
         Assert.Equal(123, item.TamanhoBytes);
     }
 
@@ -250,6 +250,70 @@ public sealed class CatalogServiceTests : IDisposable
         File.WriteAllText(Path.Combine(resto, "x.mp4"), "x");
         Novo().LimparExclusoesPendentes();
         Assert.False(Directory.Exists(resto));
+    }
+
+    // ---------- Troca de capa ----------
+
+    [Fact]
+    public void Confirmar_capa_substitui_jpg_e_muda_a_url()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        var urlAntes = cat.Itens[0].CapaUrl;
+
+        var previa = cat.CaminhoPreviaCapa("v");
+        File.WriteAllBytes(previa, [9, 9, 9]);
+        File.SetLastWriteTimeUtc(previa, DateTime.UtcNow.AddMinutes(1)); // garante data diferente
+        Assert.StartsWith("url:v.previa.jpg?v=", cat.UrlPreviaCapa("v"));
+
+        var item = cat.ConfirmarCapa("v");
+        Assert.Equal([9, 9, 9], File.ReadAllBytes(Path.Combine(Videos, "v", "v.jpg")));
+        Assert.False(File.Exists(previa));
+        Assert.NotEqual(urlAntes, item.CapaUrl); // o navegador não reaproveita a imagem antiga
+    }
+
+    [Fact]
+    public void Confirmar_sem_previa_falha_e_mantem_capa()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Throws<InvalidOperationException>(() => cat.ConfirmarCapa("v"));
+        Assert.True(File.Exists(Path.Combine(Videos, "v", "v.jpg")));
+    }
+
+    [Fact]
+    public void Descartar_previa_mantem_capa_original()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        File.WriteAllBytes(cat.CaminhoPreviaCapa("v"), [1]);
+        cat.DescartarPreviaCapa("v");
+        Assert.False(File.Exists(cat.CaminhoPreviaCapa("v")));
+        Assert.Equal(10, new FileInfo(Path.Combine(Videos, "v", "v.jpg")).Length);
+    }
+
+    [Fact]
+    public void Previa_e_ignorada_pela_varredura_e_limpa_no_inicio()
+    {
+        CriarVideo("v", capa: false);
+        var cat = Novo();
+        File.WriteAllBytes(cat.CaminhoPreviaCapa("v"), [1]);
+        cat.Varrer();
+        Assert.Null(cat.Itens[0].CapaUrl); // prévia não vira capa sozinha
+        cat.LimparExclusoesPendentes();
+        Assert.False(File.Exists(cat.CaminhoPreviaCapa("v")));
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData("nao-existe")]
+    public void Capa_rejeita_slug_invalido(string slug)
+    {
+        var cat = Novo();
+        Assert.ThrowsAny<Exception>(() => cat.CaminhoPreviaCapa(slug));
     }
 
     [Fact]

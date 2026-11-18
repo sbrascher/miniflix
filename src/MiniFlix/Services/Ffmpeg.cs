@@ -104,14 +104,37 @@ public static class Ffmpeg
         progresso(1);
     }
 
-    /// <summary>Extrai um quadro (em 10% da duração) como capa JPG de 640 px de largura.</summary>
-    public static async Task<bool> GerarCapaAsync(string video, string destinoJpg, double duracao, CancellationToken ct)
+    /// <summary>Largura padrão das capas (todas iguais: catálogo uniforme e leve no pendrive).</summary>
+    public const int LarguraCapa = 640;
+
+    /// <summary>Extrai um quadro (em 10% da duração, no máximo 60 s) como capa padrão.</summary>
+    public static Task<bool> GerarCapaAsync(string video, string destinoJpg, double duracao, CancellationToken ct) =>
+        GerarCapaNoInstanteAsync(video, destinoJpg, duracao > 0 ? Math.Min(duracao * 0.1, 60) : 1, ct);
+
+    /// <summary>Extrai o quadro do instante indicado (segundos) como capa JPG de 640 px de largura.</summary>
+    public static async Task<bool> GerarCapaNoInstanteAsync(string video, string destinoJpg, double segundos, CancellationToken ct)
     {
         var exe = Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
-        var instante = duracao > 0 ? Math.Min(duracao * 0.1, 60) : 1;
         var r = await Processo.ExecutarAsync(exe,
-            ["-hide_banner", "-loglevel", "error", "-y", "-ss", instante.ToString("0.###", CultureInfo.InvariantCulture),
-             "-i", video, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "3", destinoJpg], ct);
+            ["-hide_banner", "-loglevel", "error", "-y", "-ss", Math.Max(segundos, 0).ToString("0.###", CultureInfo.InvariantCulture),
+             "-i", video, "-frames:v", "1", "-vf", $"scale={LarguraCapa}:-2", "-q:v", "3", destinoJpg], ct);
         return r.CodigoSaida == 0 && File.Exists(destinoJpg);
+    }
+
+    /// <summary>
+    /// Converte uma imagem qualquer (JPG, PNG, WebP, BMP, GIF…) em capa no padrão do app:
+    /// JPG com até 640 px de largura (imagens menores não são ampliadas).
+    /// </summary>
+    public static async Task ConverterImagemParaCapaAsync(string imagem, string destinoJpg, CancellationToken ct)
+    {
+        var exe = Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
+        var r = await Processo.ExecutarAsync(exe,
+            ["-hide_banner", "-loglevel", "error", "-y", "-i", imagem, "-frames:v", "1",
+             "-vf", $"scale=w=min({LarguraCapa}\\,iw):h=-2:flags=lanczos,format=yuvj420p", "-q:v", "3", destinoJpg], ct);
+        if (r.CodigoSaida != 0 || !File.Exists(destinoJpg))
+        {
+            Log.Erro($"Falha ao converter imagem de capa ({r.CodigoSaida}): {r.UltimasLinhasErro}");
+            throw new InvalidOperationException("Não foi possível usar essa imagem. Tente um arquivo JPG ou PNG.");
+        }
     }
 }

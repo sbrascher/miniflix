@@ -94,6 +94,15 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   pode assistir, editar (título, categoria e descrição) ou excluir.
   A exclusão apaga o vídeo do disco e não pode ser desfeita.
 
+  TROCAR A CAPA
+    A capa é criada automaticamente (um quadro do vídeo, ou a miniatura
+    do YouTube). Para trocar, clique em Editar e, na seção "Capa":
+      * "Escolher imagem..." usa uma imagem do computador (JPG, PNG...);
+      * "Escolher quadro do vídeo" mostra o vídeo com um controle
+        deslizante: arraste até a cena desejada e clique em
+        "Usar este quadro".
+    A nova capa só é gravada ao clicar em "Salvar alterações".
+
 
 --------------------------------------------------------------------------
  5. DICAS PARA O PENDRIVE

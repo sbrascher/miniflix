@@ -39,9 +39,11 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     1. Clique em "Escolher arquivos..." e selecione um ou mais vídeos.
     2. Ajuste os títulos e escolha (ou digite) uma categoria.
     3. Clique em "Adicionar à fila".
-    Vídeos já em MP4 são apenas copiados. Outros formatos (AVI, MKV,
-    WMV, WebM...) são convertidos para MP4, o que pode levar alguns
-    minutos. O arquivo original nunca é alterado.
+    Vídeos que o MiniFlix já toca (H.264, VP9 ou AV1 - inclusive os
+    baixados do YouTube, em MP4, MKV ou WebM) são apenas copiados:
+    leva segundos e não perde qualidade. Os demais (AVI antigo, WMV,
+    HEVC/H.265...) são convertidos para MP4 em até 1080p, o que pode
+    levar alguns minutos. O arquivo original nunca é alterado.
 
   BAIXAR DO YOUTUBE (precisa de internet)
     1. Cole o link do vídeo no campo "Link do vídeo".

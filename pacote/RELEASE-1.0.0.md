@@ -33,7 +33,7 @@ O arquivo `README.txt` dentro da pasta tem o guia completo: atalhos, dicas para 
 - Tela cheia de verdade e volume lembrado entre sessões.
 
 **Adicionar vídeos**
-- **Importar do computador**, vários arquivos de uma vez. Vídeos já em MP4 são só copiados; AVI, MKV, WMV, WebM e outros são convertidos automaticamente. O arquivo original nunca é alterado.
+- **Importar do computador**, vários arquivos de uma vez. Vídeos em H.264, VP9 ou AV1 (MP4, MKV ou WebM, incluindo os baixados do YouTube) são só copiados, em segundos e sem perder qualidade. AVI antigo, WMV, HEVC/H.265 e outros são convertidos automaticamente, em até 1080p. O arquivo original nunca é alterado.
 - **Baixar do YouTube** colando o link: até 1080p, com capa, descrição e data de publicação.
 - Fila de processamento com progresso, velocidade, tempo restante e botão de cancelar. Você pode continuar assistindo enquanto ela trabalha.
 

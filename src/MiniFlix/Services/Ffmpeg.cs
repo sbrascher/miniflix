@@ -15,12 +15,20 @@ public sealed record InfoMidia(
 {
     public bool TemVideo => CodecVideo is not null;
 
-    /// <summary>Já toca em qualquer navegador: basta remuxar (copiar sem reconverter).</summary>
+    // O que o WebView2 do MiniFlix toca de verdade (testado no app: H.264 8/10 bits, VP9, AV1 8/10 bits;
+    // AAC, MP3, Opus). HEVC/H.265 toca só o áudio, sem imagem — por isso precisa de conversão.
+    private static readonly HashSet<string> VideoSuportado = ["h264", "vp9", "av1"];
+    private static readonly HashSet<string> PixelSuportado = ["yuv420p", "yuvj420p", "yuv420p10le"];
+    private static readonly HashSet<string> AudioSuportado = ["aac", "mp3", "opus"];
+
+    /// <summary>
+    /// O player já toca estas trilhas: basta copiá-las para um MP4 (remux), sem reconverter.
+    /// Vale para qualquer contêiner de origem (MP4, MOV, MKV, WebM…): leva segundos e não perde qualidade.
+    /// </summary>
     public bool CompativelSemConverter =>
-        (Formato.Contains("mp4") || Formato.Contains("mov")) &&
-        CodecVideo == "h264" &&
-        PixFmt is "yuv420p" or "yuvj420p" &&
-        (CodecAudio is null or "aac");
+        CodecVideo is not null && VideoSuportado.Contains(CodecVideo) &&
+        PixFmt is not null && PixelSuportado.Contains(PixFmt) &&
+        (CodecAudio is null || AudioSuportado.Contains(CodecAudio));
 }
 
 /// <summary>Operações com ffprobe/ffmpeg usadas pela importação e pelo download.</summary>
@@ -77,7 +85,10 @@ public static class Ffmpeg
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-nostats", "-progress", "pipe:1", "-y", "-i", origem,
                                       "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn" };
         if (converter)
-            args.AddRange(["-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p",
+            // Converte para H.264/AAC limitando a 1920×1080 (só reduz, nunca amplia; dimensões pares).
+            // Reconverter 4K para H.264 levaria horas e geraria arquivos enormes no pendrive.
+            args.AddRange(["-vf", "scale=w='min(1920,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                           "-c:v", "libx264", "-preset", "medium", "-crf", "22", "-pix_fmt", "yuv420p",
                            "-c:a", "aac", "-b:a", "160k", "-ac", "2"]);
         else
             args.AddRange(["-c", "copy"]);

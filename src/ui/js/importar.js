@@ -35,7 +35,7 @@ export function cardImportar(estado) {
     h('div', {},
       h('h2', { class: 'font-semibold' }, 'Importar do computador'),
       h('p', { class: 'mt-1 text-sm text-suave' },
-        'Escolha um ou mais vídeos do PC. Arquivos já compatíveis são copiados; os demais são convertidos para MP4.'),
+        'Escolha um ou mais vídeos do PC. Vídeos em H.264, VP9 ou AV1 (inclusive os baixados do YouTube) são copiados em segundos; os demais são convertidos para MP4.'),
       botao, aviso));
 }
 

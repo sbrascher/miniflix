@@ -106,6 +106,42 @@ public sealed class ImportacaoLocalTests : IDisposable
     }
 
     [Fact]
+    public async Task Mkv_com_vp9_e_opus_e_copiado_sem_conversao()
+    {
+        if (!TemFfmpeg) return;
+        var mkv = await GerarVideo("youtube.mkv", "-c:v", "libvpx-vp9", "-b:v", "500k", "-pix_fmt", "yuv420p", "-c:a", "libopus");
+
+        var (fila, _) = await Importar(mkv, "Baixado do YouTube", "");
+        var item = Assert.Single(fila.Itens);
+        Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
+        Assert.Contains("sem conversão", item.Mensagem);
+        var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, item.Slug!, item.Slug + ".mp4"), CancellationToken.None);
+        Assert.Equal("vp9", info.CodecVideo);   // mesma trilha, só mudou o contêiner
+        Assert.Equal("opus", info.CodecAudio);
+    }
+
+    [Fact]
+    public async Task Hevc_e_convertido_para_h264_e_limitado_a_1080p()
+    {
+        if (!TemFfmpeg) return;
+        // 2560×1440 em HEVC: precisa converter (o player não mostra a imagem) e reduzir para caber em 1080p.
+        var destino = Path.Combine(Origem, "hevc.mp4");
+        var r = await Processo.ExecutarAsync(Ferramentas.Ffmpeg!, ["-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=2560x1440:rate=15", "-f", "lavfi", "-i", "sine", "-t", "1",
+            "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error", "-c:a", "aac", destino], CancellationToken.None);
+        Assert.Equal(0, r.CodigoSaida);
+
+        var (fila, _) = await Importar(destino, "HEVC", "");
+        var item = Assert.Single(fila.Itens);
+        Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
+        Assert.Contains("Convertido", item.Mensagem);
+        var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, item.Slug!, item.Slug + ".mp4"), CancellationToken.None);
+        Assert.Equal("h264", info.CodecVideo);
+        Assert.Equal(1920, info.Largura);
+        Assert.Equal(1080, info.Altura);
+    }
+
+    [Fact]
     public async Task Mesmo_arquivo_duas_vezes_e_recusado()
     {
         if (!TemFfmpeg) return;

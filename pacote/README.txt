@@ -167,11 +167,14 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     (vídeos que ainda não têm nenhuma) e por "Só favoritos". Os
     filtros podem ser combinados; "Limpar filtros" desfaz tudo.
 
-  TAGS EM VÁRIOS VÍDEOS DE UMA VEZ
+  CATEGORIA E TAGS EM VÁRIOS VÍDEOS DE UMA VEZ
     Na tabela "Acervo", marque as caixinhas à esquerda dos vídeos
     (Shift + clique marca um intervalo; a caixinha do cabeçalho marca
-    todos os da lista). Na barra que aparece, use "Adicionar tags..."
-    ou "Remover tags...". As outras tags de cada vídeo continuam.
+    todos os da lista). Na barra que aparece:
+      * "Mudar categoria..." põe todos na mesma categoria (deixe em
+        branco para tirar a categoria);
+      * "Adicionar tags..." / "Remover tags..." mexem só nas tags
+        escolhidas; as outras tags de cada vídeo continuam.
 
   PASTA DOS VÍDEOS
     Por padrão os vídeos ficam na pasta "videos", ao lado do

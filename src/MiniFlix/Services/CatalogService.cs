@@ -236,6 +236,46 @@ public sealed class CatalogService
     /// Valida tudo antes de gravar: se algum vídeo passaria do limite de tags, nenhum é alterado.
     /// Retorna quantos vídeos mudaram de fato.
     /// </summary>
+    /// <summary>
+    /// Põe vários vídeos na mesma categoria. Vazia ou "Sem categoria" tira a categoria; o nome de uma
+    /// categoria existente é reaproveitado com a grafia dela ("cursos" → "Cursos"). Retorna quantos mudaram.
+    /// </summary>
+    public int DefinirCategoriaEmMassa(IEnumerable<string> slugs, string? categoria)
+    {
+        lock (_travaEscrita)
+        {
+            categoria = (categoria ?? "").Trim();
+            if (categoria.Length > MaxCategoria) throw new ArgumentException($"A categoria pode ter no máximo {MaxCategoria} caracteres.");
+            if (categoria.Equals(SemCategoria, StringComparison.OrdinalIgnoreCase)) categoria = "";
+            var existente = Categorias().FirstOrDefault(c => c != SemCategoria && c.Equals(categoria, StringComparison.OrdinalIgnoreCase));
+            if (existente is not null) categoria = existente;
+
+            var lista = slugs.Distinct(StringComparer.Ordinal).ToList();
+            if (lista.Count == 0) throw new ArgumentException("Nenhum vídeo selecionado.");
+
+            // Lê e valida todos antes de gravar o primeiro.
+            var gravar = new List<(string Arquivo, VideoMeta Meta)>();
+            foreach (var slug in lista)
+            {
+                var arquivo = Path.Combine(PastaDoVideo(slug), slug + ".json");
+                var meta = JsonStore.Ler<VideoMeta>(arquivo) ?? throw new KeyNotFoundException($"Vídeo não encontrado: {slug}.");
+                if ((meta.Categoria ?? "").Trim() == categoria) continue;
+                meta.Categoria = categoria;
+                gravar.Add((arquivo, meta));
+            }
+            try
+            {
+                foreach (var (arquivo, meta) in gravar) JsonStore.Gravar(arquivo, meta);
+            }
+            finally
+            {
+                Log.Info($"Categoria em massa → “{(categoria.Length == 0 ? SemCategoria : categoria)}”: {gravar.Count} vídeo(s).");
+                if (gravar.Count > 0) Varrer();
+            }
+            return gravar.Count;
+        }
+    }
+
     public int AlterarTagsEmMassa(IEnumerable<string> slugs, IEnumerable<string?> adicionar, IEnumerable<string?> remover)
     {
         lock (_travaEscrita) return AlterarTagsEmMassaCore(slugs, adicionar, remover);

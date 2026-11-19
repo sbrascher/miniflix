@@ -146,6 +146,13 @@ internal sealed class MainForm : Form
             var favorito = d?["favorito"]?.GetValue<bool>() ?? throw new ArgumentException("Parâmetro 'favorito' ausente.");
             return (object?)ParaUi(await Task.Run(() => _catalogo.DefinirFavorito(slug, favorito)));
         });
+        _bridge.Registrar("videos.alterarCategoria", async d =>
+        {
+            var slugs = (d?["slugs"] as JsonArray)?.Select(n => n?.GetValue<string>()).OfType<string>().ToList() ?? [];
+            var categoria = d?["categoria"]?.GetValue<string>();
+            var alterados = await Task.Run(() => _catalogo.DefinirCategoriaEmMassa(slugs, categoria));
+            return (object?)new { alterados };
+        });
         _bridge.Registrar("videos.alterarTags", async d =>
         {
             static List<string?> Lista(JsonObject? d, string campo) =>

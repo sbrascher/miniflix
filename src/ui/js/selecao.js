@@ -1,4 +1,4 @@
-// Seleção de vários vídeos na tabela do Acervo + ações em massa (adicionar/remover tags).
+// Seleção de vários vídeos na tabela do Acervo + ações em massa (categoria, adicionar/remover tags).
 import { bridge } from './bridge.js';
 import { h, plural } from './util.js';
 import { icone } from './icones.js';
@@ -30,6 +30,8 @@ export function criarSelecao(estado) {
   const ocultos = h('span', { class: 'text-sm text-suave' });
   const btnAdicionar = h('button', { type: 'button', class: 'btn-primario' }, icone('new_label', 18), 'Adicionar tags…');
   const btnRemover = h('button', { type: 'button', class: 'btn' }, icone('label_off', 18), 'Remover tags…');
+  const btnCategoria = h('button', { type: 'button', class: 'btn' }, icone('folder_special', 18), 'Mudar categoria…');
+  btnCategoria.addEventListener('click', () => mudarCategoria(estado));
   const btnLimpar = h('button', { type: 'button', class: 'btn' }, icone('close', 18), 'Limpar seleção');
   btnAdicionar.addEventListener('click', () => adicionarTags(estado));
   btnRemover.addEventListener('click', () => removerTags(estado));
@@ -38,7 +40,7 @@ export function criarSelecao(estado) {
   const barra = h('div', { class: 'barra-selecao hidden', role: 'region', 'aria-label': 'Ações para os vídeos selecionados' },
     h('span', { class: 'pastilha h-9 w-9' }, icone('checklist', 20)),
     h('div', { class: 'mr-auto flex flex-wrap items-baseline gap-x-2' }, contador, ocultos),
-    btnAdicionar, btnRemover, btnLimpar);
+    btnCategoria, btnAdicionar, btnRemover, btnLimpar);
 
   function atualizar() {
     const n = selecionados.size;
@@ -185,4 +187,69 @@ async function removerTags(estado) {
   chips[0]?.focus();
   const res = await r;
   if (res) toast(`${plural(res.lista.length, 'tag removida', 'tags removidas')} de ${plural(res.n, 'vídeo', 'vídeos')}.`);
+}
+
+async function mudarCategoria(estado) {
+  const videos = videosSelecionados(estado);
+  // Onde os selecionados estão hoje, para a pessoa saber o que vai mudar.
+  const hoje = new Map();
+  for (const v of videos) hoje.set(v.categoria, (hoje.get(v.categoria) ?? 0) + 1);
+  const resumoHoje = [...hoje.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} (${n})`).join(', ');
+  const unica = hoje.size === 1 ? [...hoje.keys()][0] : null;
+
+  const campo = h('input', {
+    id: 'massa-categoria', class: 'campo w-full', maxlength: 60, list: 'massa-categorias', autocomplete: 'off',
+    placeholder: 'Sem categoria', value: unica && unica !== 'Sem categoria' ? unica : '', 'aria-describedby': 'massa-categoria-aviso',
+  });
+  const aviso = h('p', { id: 'massa-categoria-aviso', class: 'mt-2 text-sm text-suave', 'aria-live': 'polite' });
+  const erro = h('p', { class: 'alerta-erro hidden', role: 'alert' });
+  const salvar = h('button', { type: 'submit', form: 'form-massa-categoria', class: 'btn-primario' }, 'Mudar categoria');
+  const n = plural(videos.length, 'vídeo selecionado', 'vídeos selecionados');
+
+  function atualizarAviso() {
+    const nome = campo.value.trim();
+    const existente = estado.categorias.find((c) => c !== 'Sem categoria' && c.toLowerCase() === nome.toLowerCase());
+    aviso.textContent = !nome || nome.toLowerCase() === 'sem categoria'
+      ? `Os ${n} ficarão sem categoria.`
+      : existente ? `Os ${n} vão para “${existente}” (categoria que já existe).`
+      : `Os ${n} vão para a nova categoria “${nome}”.`;
+  }
+  campo.addEventListener('input', atualizarAviso);
+
+  const form = h('form', { id: 'form-massa-categoria', class: 'space-y-4', novalidate: true },
+    h('p', { class: 'text-sm text-suave' }, 'Hoje: ', resumoHoje, '. Só a categoria muda; título, tags, favorito e capa continuam.'),
+    h('div', {},
+      h('label', { for: 'massa-categoria', class: 'rotulo' }, 'Nova categoria'),
+      campo,
+      h('datalist', { id: 'massa-categorias' }, estado.categorias.filter((c) => c !== 'Sem categoria').map((c) => h('option', { value: c }))),
+      aviso),
+    erro);
+
+  const r = abrirModal({
+    titulo: 'Mudar categoria',
+    corpo: form,
+    acoes: (fechar) => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        salvar.disabled = true;
+        try {
+          const res = await bridge.call('videos.alterarCategoria', { slugs: [...selecionados], categoria: campo.value });
+          fechar({ alterados: res.alterados, nome: campo.value.trim() });
+        } catch (ex) {
+          erro.textContent = ex.message;
+          erro.classList.remove('hidden');
+          salvar.disabled = false;
+        }
+      });
+      return [h('button', { type: 'button', class: 'btn', onclick: () => fechar() }, 'Cancelar'), salvar];
+    },
+  });
+  atualizarAviso();
+  campo.focus();
+  campo.select();
+  const res = await r;
+  if (!res) return;
+  toast(res.alterados
+    ? `Categoria alterada em ${plural(res.alterados, 'vídeo', 'vídeos')}.`
+    : 'Os vídeos selecionados já estavam nessa categoria.');
 }

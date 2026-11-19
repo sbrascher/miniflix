@@ -420,6 +420,45 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Equal(20, meta.Tags.Count);
     }
 
+    // ---------- Categoria em massa ----------
+
+    [Fact]
+    public void Categoria_em_massa_muda_so_os_selecionados_e_preserva_o_resto()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "Receitas");
+        CriarVideo("c", categoria: "Receitas");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("a", "A", "Cursos", "desc", ["python"]);
+        cat.DefinirFavorito("a", true);
+
+        Assert.Equal(2, cat.DefinirCategoriaEmMassa(["a", "b"], "  Aulas "));
+        var a = JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "a", "a.json"))!;
+        Assert.Equal("Aulas", a.Categoria);
+        Assert.Equal(["python"], a.Tags);  // o resto do vídeo não muda
+        Assert.True(a.Favorito);
+        Assert.Equal("desc", a.Descricao);
+        Assert.Equal("Aulas", JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "b", "b.json"))!.Categoria);
+        Assert.Equal("Receitas", JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "c", "c.json"))!.Categoria);
+    }
+
+    [Fact]
+    public void Categoria_em_massa_reaproveita_grafia_e_tira_categoria()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "Receitas");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal(1, cat.DefinirCategoriaEmMassa(["b"], "CURSOS"));
+        Assert.Equal(["Cursos"], cat.Categorias());
+        Assert.Equal(0, cat.DefinirCategoriaEmMassa(["a", "b"], "Cursos")); // já estavam
+        Assert.Equal(2, cat.DefinirCategoriaEmMassa(["a", "b"], "Sem categoria"));
+        Assert.Equal("", JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "a", "a.json"))!.Categoria);
+        Assert.Throws<ArgumentException>(() => cat.DefinirCategoriaEmMassa([], "X"));
+        Assert.Throws<ArgumentException>(() => cat.DefinirCategoriaEmMassa(["a"], new string('x', CatalogService.MaxCategoria + 1)));
+    }
+
     // ---------- Tags em massa ----------
 
     private List<string> TagsNoDisco(string slug) =>

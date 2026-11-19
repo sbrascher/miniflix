@@ -27,7 +27,7 @@
 - ✏️ **Renomear categoria:** muda todos os vídeos dela de uma vez (ou une com uma categoria existente).
 - ⭐ **Favoritos:** estrela no player e na administração; os favoritos ganham uma fileira própria no catálogo.
 - 🔎 **Filtros do acervo:** texto, categoria, tags, “Sem tags” e “Só favoritos”, combináveis.
-- 🏷️ **Tags:** cada vídeo pode ter várias tags; o catálogo filtra por uma ou mais delas (o vídeo precisa ter todas). Na administração, dá para selecionar vários vídeos e adicionar/remover tags de uma vez; a importação também aceita tags.
+- 🏷️ **Tags:** cada vídeo pode ter várias tags; o catálogo filtra por uma ou mais delas (o vídeo precisa ter todas). Na administração, dá para selecionar vários vídeos e mudar a categoria ou adicionar/remover tags de uma vez; a importação também aceita tags.
 - 📁 **Pasta dos vídeos configurável:** o acervo pode ficar em qualquer pasta (outro disco, HD externo); a escolha é salva em `data\settings.json`.
 - 🌗 **Modo claro e modo escuro.**
 - 🔌 **100% offline e portátil:** nenhuma CDN, nada no Registro, nada em `AppData`.

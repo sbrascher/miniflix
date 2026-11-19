@@ -53,6 +53,21 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
         o arquivo menor, mas perde detalhe.
     O arquivo original nunca é alterado.
 
+  IMPORTAR UMA PASTA INTEIRA
+    "Importar pasta..." inclui todos os vídeos da pasta e das
+    subpastas. A opção "Usar o nome da subpasta como categoria" põe,
+    por exemplo, Cursos\Python\aula1.mp4 na categoria "Python".
+
+  VÍDEOS QUE JÁ FORAM IMPORTADOS
+    O MiniFlix reconhece um arquivo que já está no catálogo, mesmo
+    com outro nome ou em outra pasta (compara o tamanho e trechos do
+    conteúdo, não o nome). Esses vídeos aparecem em "Já estão no
+    catálogo", desmarcados. Marque "reimportar" só se quiser trocar o
+    arquivo de vídeo (por exemplo, para importar de novo com a
+    qualidade máxima): título, categoria, tags, favorito, descrição,
+    capa e o ponto onde você parou continuam como estão.
+    Arquivos repetidos dentro da própria seleção entram uma vez só.
+
   BAIXAR DO YOUTUBE (precisa de internet)
     1. Cole o link do vídeo no campo "Link do vídeo".
     2. Escolha a categoria e clique em "Baixar".

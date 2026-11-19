@@ -33,7 +33,7 @@ public sealed class ImportacaoLocalTests : IDisposable
         File.WriteAllBytes(b, [1, 2, 4]);
         Assert.Equal(ImportacaoLocal.CalcularId(a), ImportacaoLocal.CalcularId(a));
         Assert.NotEqual(ImportacaoLocal.CalcularId(a), ImportacaoLocal.CalcularId(b));
-        Assert.StartsWith("local:", ImportacaoLocal.CalcularId(a));
+        Assert.StartsWith("local2:", ImportacaoLocal.CalcularId(a));
     }
 
     // ---------- Integração com ffmpeg (ignorados se o ffmpeg não estiver disponível) ----------

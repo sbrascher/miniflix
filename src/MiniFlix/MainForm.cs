@@ -252,50 +252,27 @@ internal sealed class MainForm : Form
             string[] escolhidos;
             if (!string.IsNullOrEmpty(arquivosTeste)) escolhidos = arquivosTeste.Split(';', StringSplitOptions.RemoveEmptyEntries);
             else if (dlg.ShowDialog(this) == DialogResult.OK) escolhidos = dlg.FileNames;
-            else return Array.Empty<object>();
+            else return null;
+            return (object?)await AnalisarParaImportarAsync(escolhidos, pastaBase: null);
+        });
 
-            // Analisa cada arquivo (ffprobe, rápido) para o modal mostrar, antes de confirmar,
-            // o que será copiado sem perda e o que precisa ser reconvertido.
-            using var limite = new SemaphoreSlim(4);
-            var itens = await Task.WhenAll(escolhidos.Select(async caminho =>
+        _bridge.Registrar("importar.escolherPasta", async _ =>
+        {
+            string? pasta = Environment.GetEnvironmentVariable("MINIFLIX_TESTE_PASTA_IMPORTAR"); // gancho de teste
+            if (string.IsNullOrEmpty(pasta))
             {
-                var token = Guid.NewGuid().ToString("N");
-                object? analise = null;
-                await limite.WaitAsync();
-                try
+                using var dlg = new FolderBrowserDialog
                 {
-                    var info = await Ffmpeg.AnalisarAsync(caminho, CancellationToken.None);
-                    if (info.TemVideo)
-                        analise = new
-                        {
-                            tratamento = info.Tratamento() switch
-                            {
-                                Tratamento.CopiarTudo => "copiar",
-                                Tratamento.ConverterSoAudio => "audio",
-                                _ => "converter",
-                            },
-                            codec = info.NomeCodecVideo,
-                            largura = info.Largura,
-                            altura = info.Altura,
-                        };
-                }
-                catch (Exception ex) { Log.Aviso($"Análise prévia falhou para {caminho}: {ex.Message}"); } // o erro aparece na fila
-                finally { limite.Release(); }
-                return (token, caminho, analise);
-            }));
-
-            return itens.Select(i =>
-            {
-                _arquivosEscolhidos[i.token] = i.caminho;
-                return (object)new
-                {
-                    i.token,
-                    nome = Path.GetFileName(i.caminho),
-                    tamanhoBytes = new FileInfo(i.caminho).Length,
-                    tituloSugerido = ImportacaoLocal.TituloSugerido(i.caminho),
-                    i.analise,
+                    Description = "Escolha a pasta com os vídeos (as subpastas também serão incluídas)",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = false,
                 };
-            }).ToArray();
+                if (dlg.ShowDialog(this) != DialogResult.OK) return null;
+                pasta = dlg.SelectedPath;
+            }
+            var arquivos = await Task.Run(() => _importacao.ListarVideosDaPasta(pasta, AppPaths.Root));
+            if (arquivos.Count == 0) throw new InvalidOperationException("Nenhum vídeo encontrado nessa pasta (nem nas subpastas).");
+            return (object?)await AnalisarParaImportarAsync(arquivos, pasta);
         });
 
         _bridge.Registrar("fila.adicionarLocal", d =>
@@ -303,23 +280,31 @@ internal sealed class MainForm : Form
             ExigirPastaDisponivel();
             Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
             Ferramentas.Exigir(Ferramentas.Ffprobe, "ffprobe");
-            var categoria = d?["categoria"]?.GetValue<string>() ?? "";
-            if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException("Categoria muito longa.");
+            var categoriaGeral = d?["categoria"]?.GetValue<string>() ?? "";
             var itens = d?["itens"] as JsonArray ?? throw new ArgumentException("Nenhum arquivo informado.");
-            // Valida as tags antes de enfileirar: o erro aparece no modal, não minutos depois na fila.
+            // Valida tudo antes de enfileirar: o erro aparece no modal, não minutos depois na fila.
             var tags = _catalogo.NormalizarTags((d?["tags"] as JsonArray)?.Select(t => t?.GetValue<string>()) ?? []);
             var reduzirPara1080 = d?["reduzirPara1080"]?.GetValue<bool>() ?? false;
-            int n = 0;
+            var novos = new List<FilaItem>();
             foreach (var no in itens)
             {
                 var token = no?["token"]?.GetValue<string>() ?? "";
-                if (!_arquivosEscolhidos.Remove(token, out var caminho)) continue; // token desconhecido ou já usado
+                if (!_arquivosEscolhidos.TryGetValue(token, out var caminho)) continue; // token desconhecido ou já usado
+                var reimportar = no?["reimportar"]?.GetValue<string>(); // slug do vídeo existente
+                if (reimportar is not null)
+                {
+                    novos.Add(_importacao.CriarItemReimportacao(caminho, reimportar, reduzirPara1080));
+                    continue;
+                }
                 var titulo = no?["titulo"]?.GetValue<string>() ?? "";
-                if (titulo.Trim().Length > CatalogService.MaxTitulo) throw new ArgumentException("Título muito longo.");
-                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria, tags, reduzirPara1080));
-                n++;
+                var categoria = no?["categoria"]?.GetValue<string>() ?? categoriaGeral; // ex.: nome da subpasta
+                if (titulo.Trim().Length > CatalogService.MaxTitulo) throw new ArgumentException($"Título muito longo: {titulo[..40]}…");
+                if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException($"Categoria muito longa: {categoria}");
+                novos.Add(_importacao.CriarItem(caminho, titulo, categoria, tags, reduzirPara1080));
             }
-            return new { adicionados = n };
+            foreach (var no in itens) _arquivosEscolhidos.Remove(no?["token"]?.GetValue<string>() ?? "");
+            foreach (var item in novos) _fila.Adicionar(item);
+            return new { adicionados = novos.Count };
         });
 
         _bridge.Registrar("fila.adicionarYoutube", d =>
@@ -371,6 +356,60 @@ internal sealed class MainForm : Form
             RunOnUi(Close);
             return new { arquivo };
         });
+    }
+
+    // ---------- Importação: análise antes do modal ----------
+
+    /// <summary>
+    /// Analisa os arquivos escolhidos (impressão digital + o que será preciso fazer com cada um) emitindo
+    /// "importar.progresso", e devolve para o modal: novos, já no catálogo e repetidos dentro da seleção.
+    /// A UI só recebe tokens: não pode pedir para importar caminhos arbitrários.
+    /// </summary>
+    private async Task<object> AnalisarParaImportarAsync(IReadOnlyList<string> arquivos, string? pastaBase)
+    {
+        var ultimoAviso = 0L;
+        var analisados = await _importacao.AnalisarAsync(arquivos, pastaBase, (feitos, total) =>
+        {
+            // No máximo ~10 avisos por segundo (pastas com centenas de vídeos).
+            var agora = Environment.TickCount64;
+            if (feitos < total && agora - Interlocked.Read(ref ultimoAviso) < 100) return;
+            Interlocked.Exchange(ref ultimoAviso, agora);
+            _bridge.Emitir("importar.progresso", new { feitos, total });
+        }, CancellationToken.None);
+
+        var vistos = new Dictionary<string, string>(); // impressão → nome do primeiro arquivo com ela
+        var lista = analisados.Select(a =>
+        {
+            var token = Guid.NewGuid().ToString("N");
+            _arquivosEscolhidos[token] = a.Caminho;
+            string? repetidoDe = null;
+            if (a.Ids is { } ids && !vistos.TryAdd(ids.Atual, Path.GetFileName(a.Caminho))) repetidoDe = vistos[ids.Atual];
+            return (object)new
+            {
+                token,
+                nome = Path.GetFileName(a.Caminho),
+                a.CaminhoRelativo,
+                a.Subpasta,
+                a.TamanhoBytes,
+                tituloSugerido = ImportacaoLocal.TituloSugerido(a.Caminho),
+                analise = a.Info is { TemVideo: true } info ? new
+                {
+                    tratamento = info.Tratamento() switch
+                    {
+                        Tratamento.CopiarTudo => "copiar",
+                        Tratamento.ConverterSoAudio => "audio",
+                        _ => "converter",
+                    },
+                    codec = info.NomeCodecVideo,
+                    largura = info.Largura,
+                    altura = info.Altura,
+                } : null,
+                existente = a.Existente is { } e ? new { e.Meta.Slug, e.Meta.Titulo, e.Meta.Categoria } : null,
+                repetidoDe,
+                a.Erro,
+            };
+        }).ToList();
+        return new { pasta = pastaBase, arquivos = lista };
     }
 
     // ---------- Pasta dos vídeos ----------

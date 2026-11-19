@@ -361,8 +361,16 @@ public sealed class CatalogService
         // Só um nível (<slug>/<slug>.previa.jpg): a pasta pode ser escolhida pelo usuário e ter outras coisas.
         foreach (var dir in Directory.EnumerateDirectories(_pastaVideos))
         {
-            var previa = Path.Combine(dir, Path.GetFileName(dir) + SufixoPrevia);
+            var nome = Path.GetFileName(dir);
+            var previa = Path.Combine(dir, nome + SufixoPrevia);
             try { if (File.Exists(previa)) File.Delete(previa); } catch (IOException) { }
+
+            // Reimportação interrompida (app fechado no meio da troca): se o vídeo novo não chegou, volta o antigo.
+            var backup = Path.Combine(dir, nome + SufixoSubstituindo);
+            if (!File.Exists(backup)) continue;
+            var mp4 = Path.Combine(dir, nome + ".mp4");
+            try { if (File.Exists(mp4)) File.Delete(backup); else File.Move(backup, mp4); }
+            catch (IOException ex) { Log.Aviso($"Não foi possível resolver {backup}: {ex.Message}"); }
         }
     }
 
@@ -421,6 +429,62 @@ public sealed class CatalogService
     public bool ExisteId(string id) => Itens.Any(i => i.Meta.Id == id);
 
     public VideoItem? ObterPorId(string id) => Itens.FirstOrDefault(i => i.Meta.Id == id);
+
+    /// <summary>Vídeo do catálogo importado deste mesmo arquivo (compara com a impressão atual e com a antiga).</summary>
+    public VideoItem? ObterPorImpressao(ImpressaoDigital.Ids ids) => Itens.FirstOrDefault(i => ids.Contem(i.Meta.Id));
+
+    // ---------- Reimportação ----------
+
+    private const string SufixoSubstituindo = ".mp4.substituindo";
+
+    /// <summary>
+    /// Troca só o arquivo de vídeo de um vídeo existente, mantendo título, categoria, tags, favorito,
+    /// descrição, capa, Id (e com ele o "continuar assistindo") e o nome da pasta.
+    /// <paramref name="pastaTemporaria"/> contém "video.mp4" (e opcionalmente "capa.jpg", usada só se o
+    /// vídeo não tiver capa). O vídeo antigo vira um backup e só é apagado depois que o novo está no lugar.
+    /// </summary>
+    public VideoItem SubstituirVideo(string slug, string pastaTemporaria, double duracaoSegundos)
+    {
+        lock (_travaEscrita)
+        {
+            var pasta = PastaDoVideo(slug);
+            var mp4 = Path.Combine(pasta, slug + ".mp4");
+            var backup = Path.Combine(pasta, slug + SufixoSubstituindo);
+            var arquivoJson = Path.Combine(pasta, slug + ".json");
+            var meta = JsonStore.Ler<VideoMeta>(arquivoJson) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+
+            // 1) Tira o antigo do caminho (falha se estiver aberto no player).
+            if (File.Exists(backup)) File.Delete(backup);
+            bool movido = false;
+            for (int tentativa = 0; tentativa < 10 && !movido; tentativa++)
+            {
+                try { File.Move(mp4, backup); movido = true; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Thread.Sleep(250); }
+            }
+            if (!movido)
+                throw new InvalidOperationException("Não foi possível reimportar: o vídeo está aberto. Feche-o e tente novamente.");
+
+            // 2) Coloca o novo; se der errado, devolve o antigo.
+            try { File.Move(Path.Combine(pastaTemporaria, "video.mp4"), mp4); }
+            catch
+            {
+                File.Move(backup, mp4);
+                throw;
+            }
+
+            var capaNova = Path.Combine(pastaTemporaria, "capa.jpg");
+            var capa = Path.Combine(pasta, slug + ".jpg");
+            if (!File.Exists(capa) && File.Exists(capaNova)) File.Move(capaNova, capa);
+
+            meta.Slug = slug;
+            meta.DuracaoSegundos = Math.Round(duracaoSegundos, 2);
+            JsonStore.Gravar(arquivoJson, meta);
+            try { File.Delete(backup); } catch (IOException) { /* apagado na próxima abertura */ }
+            Log.Info($"Vídeo reimportado: {slug} (metadados mantidos)");
+        }
+        Varrer();
+        return Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+    }
 
     /// <summary>
     /// Cria uma pasta de trabalho dentro de /videos (mesma unidade: a publicação é só um rename).

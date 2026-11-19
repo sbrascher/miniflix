@@ -20,15 +20,105 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo)
         return nome.Length == 0 ? "Vídeo" : nome;
     }
 
-    /// <summary>Identificador estável do arquivo: SHA-256 do primeiro 1 MB + tamanho.</summary>
-    public static string CalcularId(string arquivo)
+    /// <summary>Identificador do arquivo de origem (impressão digital atual; ver <see cref="ImpressaoDigital"/>).</summary>
+    public static string CalcularId(string arquivo) => ImpressaoDigital.Calcular(arquivo).Atual;
+
+    // ---------- Escolha e análise (antes de enfileirar) ----------
+
+    public const int MaxArquivosPorVez = 2000;
+
+    /// <summary>
+    /// Lista os vídeos de uma pasta e de todas as subpastas (por extensão), em ordem de caminho.
+    /// Pula pastas ocultas/do sistema, pastas sem permissão e a própria pasta de vídeos do MiniFlix.
+    /// </summary>
+    public IReadOnlyList<string> ListarVideosDaPasta(string pasta, params string[] ignorar)
     {
-        using var fs = new FileStream(arquivo, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        var buffer = new byte[Math.Min(fs.Length, 1024 * 1024)];
-        fs.ReadExactly(buffer);
-        var hash = SHA256.HashData([.. buffer, .. BitConverter.GetBytes(fs.Length)]);
-        return "local:" + Convert.ToHexStringLower(hash)[..16];
+        var opcoes = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint,
+        };
+        var excluir = ignorar.Append(catalogo.PastaVideos).ToArray();
+        var lista = Directory.EnumerateFiles(pasta, "*", opcoes)
+            .Where(f => Extensoes.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+            .Where(f => !excluir.Any(e => PastaVideos.Dentro(f, e)))
+            .Take(MaxArquivosPorVez + 1)
+            .Order(StringComparer.Create(System.Globalization.CultureInfo.GetCultureInfo("pt-BR"), ignoreCase: true))
+            .ToList();
+        if (lista.Count > MaxArquivosPorVez)
+            throw new InvalidOperationException($"A pasta tem mais de {MaxArquivosPorVez} vídeos. Escolha uma subpasta.");
+        return lista;
     }
+
+    /// <summary>O que o modal precisa saber de cada arquivo escolhido.</summary>
+    public sealed record ArquivoAnalisado(
+        string Caminho,
+        string? Subpasta,                 // nome da pasta do arquivo, se estiver numa subpasta da pasta escolhida
+        string? CaminhoRelativo,          // para exibir no modo pasta
+        long TamanhoBytes,
+        ImpressaoDigital.Ids? Ids,
+        InfoMidia? Info,
+        VideoItem? Existente,             // já está no catálogo (mesmo arquivo)
+        string? Erro);
+
+    /// <summary>
+    /// Analisa os arquivos (impressão digital + ffprobe) em paralelo, informando o progresso.
+    /// <paramref name="pastaBase"/>: pasta escolhida no modo "Importar pasta" (para subpasta/caminho relativo).
+    /// </summary>
+    public async Task<IReadOnlyList<ArquivoAnalisado>> AnalisarAsync(IReadOnlyList<string> arquivos, string? pastaBase,
+        Action<int, int> progresso, CancellationToken ct)
+    {
+        int feitos = 0;
+        using var limite = new SemaphoreSlim(4);
+        var tarefas = arquivos.Select(async caminho =>
+        {
+            await limite.WaitAsync(ct);
+            try
+            {
+                string? subpasta = null, relativo = null;
+                if (pastaBase is not null)
+                {
+                    relativo = Path.GetRelativePath(pastaBase, caminho);
+                    var dir = Path.GetDirectoryName(caminho);
+                    if (dir is not null && !PastaVideos.MesmoCaminho(dir, pastaBase)) subpasta = Path.GetFileName(dir);
+                }
+                // 1) Impressão digital: o "já está no catálogo" vale mesmo que a análise do vídeo falhe.
+                long tamanho;
+                ImpressaoDigital.Ids ids;
+                try
+                {
+                    tamanho = new FileInfo(caminho).Length;
+                    ids = await Task.Run(() => ImpressaoDigital.Calcular(caminho), ct);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    Log.Aviso($"Não foi possível ler {caminho}: {ex.Message}");
+                    return new ArquivoAnalisado(caminho, subpasta, relativo, 0, null, null, null, "Não foi possível ler o arquivo.");
+                }
+                var existente = catalogo.ObterPorImpressao(ids);
+
+                // 2) O que será preciso fazer (copiar ou converter).
+                InfoMidia? info = null;
+                string? erro = null;
+                try
+                {
+                    info = await Ffmpeg.AnalisarAsync(caminho, ct);
+                    if (!info.TemVideo) erro = "O arquivo não contém vídeo.";
+                }
+                catch (InvalidOperationException ex) { erro = ex.Message; }
+                return new ArquivoAnalisado(caminho, subpasta, relativo, tamanho, ids, info, existente, erro);
+            }
+            finally
+            {
+                limite.Release();
+                progresso(Interlocked.Increment(ref feitos), arquivos.Count);
+            }
+        });
+        return await Task.WhenAll(tarefas);
+    }
+
+    // ---------- Fila ----------
 
     /// <param name="tags">Tags do vídeo (já validadas por <see cref="CatalogService.NormalizarTags"/>).</param>
     /// <param name="reduzirPara1080">Só para vídeos que precisam ser reconvertidos: limita a 1920×1080 (arquivo menor).</param>
@@ -39,19 +129,39 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo)
         Titulo = string.IsNullOrWhiteSpace(titulo) ? TituloSugerido(arquivo) : titulo.Trim(),
         Categoria = categoria.Trim(),
         Origem = Path.GetFileName(arquivo),
-        Executor = (item, relator, ct) => ExecutarAsync(item, arquivo, tags ?? [], reduzirPara1080, relator, ct),
+        Executor = (item, relator, ct) => ExecutarAsync(item, arquivo, tags ?? [], reduzirPara1080, null, relator, ct),
     };
 
+    /// <summary>
+    /// Reimporta <paramref name="arquivo"/> por cima do vídeo <paramref name="slug"/>: troca só o arquivo de
+    /// vídeo e mantém título, categoria, tags, favorito, descrição, capa e o "continuar assistindo".
+    /// </summary>
+    public FilaItem CriarItemReimportacao(string arquivo, string slug, bool reduzirPara1080 = false)
+    {
+        var existente = catalogo.Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado no catálogo.");
+        return new FilaItem
+        {
+            Tipo = "local",
+            Titulo = existente.Meta.Titulo,
+            Categoria = existente.Meta.Categoria,
+            Origem = Path.GetFileName(arquivo),
+            Executor = (item, relator, ct) => ExecutarAsync(item, arquivo, [], reduzirPara1080, slug, relator, ct),
+        };
+    }
+
     private async Task ExecutarAsync(FilaItem item, string arquivo, IReadOnlyList<string> tags, bool reduzirPara1080,
-        Relator relator, CancellationToken ct)
+        string? reimportarSlug, Relator relator, CancellationToken ct)
     {
         // 1. Análise
         relator.Etapa("Analisando arquivo", 0, 0.03);
         if (!File.Exists(arquivo)) throw new FileNotFoundException("O arquivo de origem não foi encontrado (foi movido ou o pendrive foi removido?).");
 
-        var id = CalcularId(arquivo);
-        if (catalogo.ObterPorId(id) is { } existente)
+        var ids = ImpressaoDigital.Calcular(arquivo);
+        var id = ids.Atual;
+        if (reimportarSlug is null && catalogo.ObterPorImpressao(ids) is { } existente)
             throw new InvalidOperationException($"Este vídeo já está no catálogo: “{existente.Meta.Titulo}”.");
+        if (reimportarSlug is not null && catalogo.Obter(reimportarSlug) is null)
+            throw new InvalidOperationException("O vídeo a ser reimportado não está mais no catálogo.");
 
         var info = await Ffmpeg.AnalisarAsync(arquivo, ct);
         if (!info.TemVideo) throw new InvalidOperationException("O arquivo não contém uma trilha de vídeo.");
@@ -81,6 +191,14 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo)
             // 4. Metadados + publicação
             relator.Etapa("Salvando no catálogo", 0.98, 1);
             ct.ThrowIfCancellationRequested();
+            if (reimportarSlug is not null)
+            {
+                catalogo.SubstituirVideo(reimportarSlug, pasta, info.DuracaoSegundos);
+                CatalogService.DescartarPastaTemporaria(pasta);
+                item.Slug = reimportarSlug;
+                item.Mensagem = "Reimportado (título, tags e capa mantidos). " + Mensagem(info, tratamento, reduziu);
+                return;
+            }
             item.Slug = catalogo.Publicar(pasta, new VideoMeta
             {
                 Id = id,

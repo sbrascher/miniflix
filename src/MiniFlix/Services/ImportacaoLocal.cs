@@ -30,16 +30,17 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo)
         return "local:" + Convert.ToHexStringLower(hash)[..16];
     }
 
-    public FilaItem CriarItem(string arquivo, string titulo, string categoria) => new()
+    /// <param name="tags">Tags do vídeo (já validadas por <see cref="CatalogService.NormalizarTags"/>).</param>
+    public FilaItem CriarItem(string arquivo, string titulo, string categoria, IReadOnlyList<string>? tags = null) => new()
     {
         Tipo = "local",
         Titulo = string.IsNullOrWhiteSpace(titulo) ? TituloSugerido(arquivo) : titulo.Trim(),
         Categoria = categoria.Trim(),
         Origem = Path.GetFileName(arquivo),
-        Executor = (item, relator, ct) => ExecutarAsync(item, arquivo, relator, ct),
+        Executor = (item, relator, ct) => ExecutarAsync(item, arquivo, tags ?? [], relator, ct),
     };
 
-    private async Task ExecutarAsync(FilaItem item, string arquivo, Relator relator, CancellationToken ct)
+    private async Task ExecutarAsync(FilaItem item, string arquivo, IReadOnlyList<string> tags, Relator relator, CancellationToken ct)
     {
         // 1. Análise
         relator.Etapa("Analisando arquivo", 0, 0.03);
@@ -77,6 +78,8 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo)
                 Id = id,
                 Titulo = item.Titulo,
                 Categoria = item.Categoria,
+                // Normaliza de novo na publicação: reaproveita a grafia de tags criadas enquanto o item esperava na fila.
+                Tags = catalogo.NormalizarTags(tags),
                 Origem = "local",
                 UrlOrigem = null,
                 DuracaoSegundos = Math.Round(info.DuracaoSegundos, 2),

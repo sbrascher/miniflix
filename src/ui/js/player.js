@@ -1,6 +1,7 @@
 import { h, fmtData, fmtDuracao } from './util.js';
 import { icone } from './icones.js';
 import { abrirModal } from './componentes.js';
+import { botaoFavorito } from './favorito.js';
 import { obterProgresso, emAndamento, registrarProgresso, reiniciarProgresso } from './progresso.js';
 
 /** Intervalo entre envios de progresso durante a reprodução (o C# agrupa as gravações em disco). */
@@ -92,7 +93,9 @@ export function renderPlayer(raiz, v) {
         h('button', { type: 'button', class: 'btn', onclick: () => mostrarAtalhos(), 'aria-keyshortcuts': 'Shift+?' },
           icone('keyboard', 18), 'Atalhos')),
       h('div', { class: 'moldura-player mt-5' }, tela),
-      h('h1', { class: 'mt-7 font-display text-2xl font-bold leading-tight sm:text-3xl' }, v.titulo),
+      h('div', { class: 'mt-7 flex items-start justify-between gap-4' },
+        h('h1', { class: 'font-display text-2xl font-bold leading-tight sm:text-3xl' }, v.titulo),
+        h('div', { class: 'shrink-0' }, botaoFavorito(v, { comTexto: true }))),
       h('div', { class: 'mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-suave' }, meta),
       v.tags?.length > 0 && h('ul', { class: 'mt-4 flex flex-wrap gap-2', 'aria-label': 'Tags' },
         v.tags.map((t) => h('li', {},

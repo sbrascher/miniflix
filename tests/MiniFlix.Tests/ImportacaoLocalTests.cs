@@ -52,11 +52,12 @@ public sealed class ImportacaoLocalTests : IDisposable
         return destino;
     }
 
-    private async Task<(FilaService fila, CatalogService cat)> Importar(string arquivo, string titulo, string categoria)
+    private async Task<(FilaService fila, CatalogService cat)> Importar(string arquivo, string titulo, string categoria,
+        IReadOnlyList<string>? tags = null)
     {
         var cat = new CatalogService(Videos, Path.Combine(_raiz, "cache.json"), p => p);
         var fila = new FilaService();
-        fila.Adicionar(new ImportacaoLocal(cat).CriarItem(arquivo, titulo, categoria));
+        fila.Adicionar(new ImportacaoLocal(cat).CriarItem(arquivo, titulo, categoria, tags));
         var fim = DateTime.Now.AddSeconds(60);
         while (fila.Ocupada && DateTime.Now < fim) await Task.Delay(50);
         return (fila, cat);
@@ -85,6 +86,18 @@ public sealed class ImportacaoLocalTests : IDisposable
         Assert.Single(cat.Itens);
         Assert.Empty(Directory.GetDirectories(Videos, "_tmp-*"));
         Assert.True(File.Exists(mp4), "o arquivo original não pode ser alterado");
+    }
+
+    [Fact]
+    public async Task Importacao_grava_as_tags()
+    {
+        if (!TemFfmpeg) return;
+        var mp4 = await GerarVideo("tags.mp4", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
+        var (fila, cat) = await Importar(mp4, "Com tags", "Cursos", ["python", "iniciante"]);
+        Assert.Equal(EstadoFila.Concluido, Assert.Single(fila.Itens).Estado);
+        Assert.Equal(["python", "iniciante"], Assert.Single(cat.Itens).Meta.Tags);
+        Assert.Equal(["python", "iniciante"],
+            JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "com-tags", "com-tags.json"))!.Tags);
     }
 
     [Fact]

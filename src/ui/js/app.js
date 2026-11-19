@@ -103,8 +103,14 @@ function atualizarCatalogoNaTela() {
 /** Depois de editar/excluir/recarregar: redesenha a tela atual com os dados novos. */
 function atualizarTelaAtual() {
   const rota = rotaAtual().nome;
+  // Elementos com data-foco recebem o foco de volta depois de redesenhar (ex.: a estrela clicada).
+  const foco = document.activeElement?.dataset?.foco;
+  const rolagem = window.scrollY;
   if (rota === 'catalogo') desenharCatalogo();
   else if (rota === 'admin') renderAdmin(raiz, estado);
+  else return;
+  window.scrollTo(0, rolagem);
+  if (foco) raiz.querySelector(`[data-foco="${CSS.escape(foco)}"]`)?.focus({ preventScroll: true });
 }
 
 campoBusca.addEventListener('input', () => { estado.busca = campoBusca.value; irParaCatalogoSeNecessario(); atualizarCatalogoNaTela(); });

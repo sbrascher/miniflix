@@ -12,8 +12,16 @@ import { campoTags } from './tags.js';
 import { painelPasta } from './pasta.js';
 import { painelCategorias } from './categorias.js';
 import { criarSelecao } from './selecao.js';
+import { botaoFavorito } from './favorito.js';
 
-let filtro = ''; // preservado entre re-renderizações
+// Filtros do acervo — preservados entre re-renderizações (ex.: depois de salvar um vídeo).
+let filtro = '';
+let filtroCategoria = '';
+let filtroTags = [];      // o vídeo precisa ter todas
+let filtroSemTags = false;
+let soFavoritos = false;
+
+const SEM_TAGS = Symbol('sem-tags'); // chip "Sem tags": um Symbol nunca colide com uma tag real
 
 /** Tela 3 — Área administrativa. */
 export function renderAdmin(raiz, estado) {
@@ -26,6 +34,53 @@ export function renderAdmin(raiz, estado) {
     value: filtro, 'aria-label': 'Filtrar acervo',
   });
   campoFiltro.addEventListener('input', () => { filtro = campoFiltro.value; renderTabela(); });
+
+  // Filtros que somem do acervo (categoria renomeada, tag removida) deixam de valer.
+  if (filtroCategoria && !estado.categorias.includes(filtroCategoria)) filtroCategoria = '';
+  filtroTags = filtroTags.filter((t) => (estado.tags ?? []).includes(t));
+
+  const campoCategoria = h('select', { class: 'campo campo-select max-w-56', 'aria-label': 'Filtrar acervo por categoria' },
+    h('option', { value: '' }, 'Todas as categorias'),
+    estado.categorias.map((c) => h('option', { value: c, selected: c === filtroCategoria }, c)));
+  campoCategoria.addEventListener('change', () => { filtroCategoria = campoCategoria.value; renderTabela(); });
+
+  const btnFavoritos = h('button', { type: 'button', class: 'btn btn-favorito', 'aria-pressed': String(soFavoritos) },
+    icone('star', 18, soFavoritos), 'Só favoritos');
+  btnFavoritos.addEventListener('click', () => {
+    soFavoritos = !soFavoritos;
+    btnFavoritos.setAttribute('aria-pressed', String(soFavoritos));
+    btnFavoritos.replaceChildren(icone('star', 18, soFavoritos), 'Só favoritos');
+    renderTabela();
+  });
+
+  const btnLimparFiltros = h('button', { type: 'button', class: 'text-sm font-medium text-destaque hover:underline' }, 'Limpar filtros');
+  btnLimparFiltros.addEventListener('click', () => {
+    filtro = ''; filtroCategoria = ''; filtroTags = []; filtroSemTags = false; soFavoritos = false;
+    renderAdmin(raiz, estado);
+    raiz.querySelector('input[aria-label="Filtrar acervo"]')?.focus();
+  });
+
+  // Chips de tag (igual ao catálogo) + "Sem tags", que é exclusivo: não combina com as outras.
+  const barraTags = h('div', { class: 'mb-5 flex flex-wrap items-center gap-2.5', role: 'group', 'aria-labelledby': 'rotulo-tags-acervo' });
+  function desenharTags(focar) {
+    const chip = (valor, rotulo, ativo, iconeExtra) => h('button', {
+      type: 'button', class: 'chip chip-filtro', 'aria-pressed': String(ativo),
+      'data-tag': valor === SEM_TAGS ? null : valor, 'data-sem-tags': valor === SEM_TAGS,
+      onclick: () => {
+        if (valor === SEM_TAGS) { filtroSemTags = !filtroSemTags; filtroTags = []; }
+        else { filtroSemTags = false; filtroTags = filtroTags.includes(valor) ? filtroTags.filter((t) => t !== valor) : [...filtroTags, valor]; }
+        desenharTags(valor);
+        renderTabela();
+      },
+    }, ativo ? icone('check', 14) : iconeExtra, rotulo);
+    barraTags.replaceChildren(
+      h('span', { id: 'rotulo-tags-acervo', class: 'mr-1 flex items-center gap-1.5 text-sm font-semibold text-suave' },
+        icone('sell', 18), 'Tags'),
+      chip(SEM_TAGS, 'Sem tags', filtroSemTags, icone('label_off', 14)),
+      ...(estado.tags ?? []).map((t) => chip(t, t, filtroTags.includes(t))));
+    if (focar) barraTags.querySelector(focar === SEM_TAGS ? '[data-sem-tags]' : `[data-tag="${CSS.escape(focar)}"]`)?.focus();
+  }
+  desenharTags();
 
   const btnRecarregar = h('button', { type: 'button', class: 'btn', title: 'Ler novamente a pasta dos vídeos' },
     icone('refresh', 18), 'Recarregar pasta');
@@ -44,11 +99,20 @@ export function renderAdmin(raiz, estado) {
 
   function renderTabela() {
     const termos = normalizar(filtro).split(/\s+/).filter(Boolean);
+    const tagsMin = filtroTags.map((t) => t.toLowerCase());
     const lista = estado.videos.filter((v) => {
-      const alvo = normalizar(`${v.titulo} ${v.categoria} ${(v.tags ?? []).join(' ')}`);
-      return termos.every((t) => alvo.includes(t));
+      const tags = v.tags ?? [];
+      const alvo = normalizar(`${v.titulo} ${v.categoria} ${tags.join(' ')}`);
+      const doVideo = tags.map((t) => t.toLowerCase());
+      return termos.every((t) => alvo.includes(t)) &&
+        (!filtroCategoria || v.categoria === filtroCategoria) &&
+        (!filtroSemTags || tags.length === 0) &&
+        tagsMin.every((t) => doVideo.includes(t)) &&
+        (!soFavoritos || v.favorito);
     });
-    contador.textContent = filtro.trim()
+    const algumFiltro = !!(filtro.trim() || filtroCategoria || filtroTags.length || filtroSemTags || soFavoritos);
+    btnLimparFiltros.classList.toggle('hidden', !algumFiltro);
+    contador.textContent = algumFiltro
       ? `${lista.length} de ${plural(estado.videos.length, 'vídeo', 'vídeos')}`
       : plural(estado.videos.length, 'vídeo', 'vídeos');
 
@@ -58,7 +122,7 @@ export function renderAdmin(raiz, estado) {
       return;
     }
     if (lista.length === 0) {
-      corpoTabela.replaceChildren(h('p', { class: 'px-6 py-14 text-center text-suave' }, 'Nenhum vídeo corresponde ao filtro.'));
+      corpoTabela.replaceChildren(h('p', { class: 'px-6 py-14 text-center text-suave' }, 'Nenhum vídeo corresponde aos filtros.'));
       selecao.caixaCabecalho([]);
       selecao.atualizar();
       return;
@@ -100,6 +164,12 @@ export function renderAdmin(raiz, estado) {
             h('span', { class: 'pointer-events-none absolute left-3.5 top-1/2 flex -translate-y-1/2 text-suave' }, icone('search', 18)),
             campoFiltro),
           btnRecarregar)),
+      estado.videos.length
+        ? h('div', { class: 'mb-4 flex flex-wrap items-center gap-3' },
+            h('label', { class: 'relative' }, campoCategoria, h('span', { class: 'icone campo-seta', 'aria-hidden': 'true' }, 'expand_more')),
+            btnFavoritos, btnLimparFiltros)
+        : null,
+      estado.videos.length ? barraTags : null,
       selecao.barra,
       h('div', { class: 'painel overflow-hidden' }, corpoTabela))));
 
@@ -135,6 +205,7 @@ function linha(v, estado, caixaSelecao) {
     h('td', { class: 'hidden text-sm tabular-nums text-suave lg:table-cell' }, fmtDataHora(v.dataAdicionado) || '—'),
     h('td', {},
       h('div', { class: 'flex justify-end gap-1.5' },
+        botaoFavorito(v),
         acao('play_arrow', 'Assistir', { href: `#/video/${encodeURIComponent(v.slug)}` }),
         acao('edit', 'Editar', { onclick: () => editar(v, estado) }),
         acao('delete', 'Excluir', { onclick: () => excluir(v), class: 'btn-icone btn-icone-perigo' }))));

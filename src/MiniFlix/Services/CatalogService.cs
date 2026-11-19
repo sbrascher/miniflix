@@ -94,6 +94,11 @@ public sealed class CatalogService
     /// <summary>Lê todas as pastas de /videos, atualiza memória e cache. Retorna true se algo mudou.</summary>
     public bool Varrer()
     {
+        lock (_travaVarredura) return VarrerCore();
+    }
+
+    private bool VarrerCore()
+    {
         var pastaVideos = _pastaVideos;
         if (_criarSeFaltar) Directory.CreateDirectory(pastaVideos);
         var novos = new List<VideoItem>();
@@ -172,6 +177,11 @@ public sealed class CatalogService
     /// <summary>Altera título, categoria, descrição e tags (null = manter). O slug (nome da pasta) nunca muda.</summary>
     public VideoItem Editar(string slug, string? titulo, string? categoria, string? descricao, IEnumerable<string?>? tags = null)
     {
+        lock (_travaEscrita) return EditarCore(slug, titulo, categoria, descricao, tags);
+    }
+
+    private VideoItem EditarCore(string slug, string? titulo, string? categoria, string? descricao, IEnumerable<string?>? tags)
+    {
         var pasta = PastaDoVideo(slug);
         var arquivo = Path.Combine(pasta, slug + ".json");
         var meta = JsonStore.Ler<VideoMeta>(arquivo) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
@@ -201,12 +211,37 @@ public sealed class CatalogService
         return Obter(slug) ?? throw new InvalidOperationException("Vídeo sumiu após a edição.");
     }
 
+    /// <summary>Marca ou desmarca o vídeo como favorito.</summary>
+    public VideoItem DefinirFavorito(string slug, bool favorito)
+    {
+        lock (_travaEscrita) return DefinirFavoritoCore(slug, favorito);
+    }
+
+    private VideoItem DefinirFavoritoCore(string slug, bool favorito)
+    {
+        var arquivo = Path.Combine(PastaDoVideo(slug), slug + ".json");
+        var meta = JsonStore.Ler<VideoMeta>(arquivo) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+        if (meta.Favorito != favorito)
+        {
+            meta.Favorito = favorito;
+            JsonStore.Gravar(arquivo, meta);
+            Log.Info($"Favorito {(favorito ? "marcado" : "desmarcado")}: {slug}");
+            Varrer();
+        }
+        return Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+    }
+
     /// <summary>
     /// Adiciona e/ou remove tags de vários vídeos de uma vez (as demais tags de cada vídeo continuam).
     /// Valida tudo antes de gravar: se algum vídeo passaria do limite de tags, nenhum é alterado.
     /// Retorna quantos vídeos mudaram de fato.
     /// </summary>
     public int AlterarTagsEmMassa(IEnumerable<string> slugs, IEnumerable<string?> adicionar, IEnumerable<string?> remover)
+    {
+        lock (_travaEscrita) return AlterarTagsEmMassaCore(slugs, adicionar, remover);
+    }
+
+    private int AlterarTagsEmMassaCore(IEnumerable<string> slugs, IEnumerable<string?> adicionar, IEnumerable<string?> remover)
     {
         var novas = NormalizarTags(adicionar);
         var tirar = remover.Select(t => (t ?? "").Trim()).Where(t => t.Length > 0).ToList();
@@ -251,6 +286,11 @@ public sealed class CatalogService
     /// vazia ou "Sem categoria" tira a categoria dos vídeos. Retorna quantos vídeos foram alterados.
     /// </summary>
     public int RenomearCategoria(string antiga, string? nova)
+    {
+        lock (_travaEscrita) return RenomearCategoriaCore(antiga, nova);
+    }
+
+    private int RenomearCategoriaCore(string antiga, string? nova)
     {
         antiga = (antiga ?? "").Trim();
         nova = (nova ?? "").Trim();
@@ -347,6 +387,11 @@ public sealed class CatalogService
     /// <summary>Substitui a capa pela prévia (rename atômico na mesma pasta) e atualiza o catálogo.</summary>
     public VideoItem ConfirmarCapa(string slug)
     {
+        lock (_travaEscrita) return ConfirmarCapaCore(slug);
+    }
+
+    private VideoItem ConfirmarCapaCore(string slug)
+    {
         var previa = CaminhoPreviaCapa(slug);
         if (!File.Exists(previa)) throw new InvalidOperationException("Não há uma nova capa para salvar.");
         File.Move(previa, Path.Combine(PastaDoVideo(slug), slug + ".jpg"), overwrite: true);
@@ -365,6 +410,13 @@ public sealed class CatalogService
 
     private const string PrefixoTemporario = "_tmp-";
     private readonly object _travaPublicacao = new();
+    /// <summary>
+    /// Serializa as alterações de metadados: a ponte atende comandos em paralelo, e duas edições do
+    /// mesmo .json ao mesmo tempo (ex.: favoritar e logo em seguida aplicar tags em massa) fariam a
+    /// segunda gravar por cima da primeira.
+    /// </summary>
+    private readonly object _travaEscrita = new();
+    private readonly object _travaVarredura = new();
 
     public bool ExisteId(string id) => Itens.Any(i => i.Meta.Id == id);
 
@@ -458,7 +510,7 @@ public sealed class CatalogService
             var (x, y) = (a[i], b[i]);
             if (x.Meta.Slug != y.Meta.Slug || x.Meta.Titulo != y.Meta.Titulo || x.Meta.Categoria != y.Meta.Categoria ||
                 x.Meta.Descricao != y.Meta.Descricao || x.Meta.DuracaoSegundos != y.Meta.DuracaoSegundos ||
-                !x.Meta.Tags.SequenceEqual(y.Meta.Tags) || x.VideoUrl != y.VideoUrl ||
+                !x.Meta.Tags.SequenceEqual(y.Meta.Tags) || x.Meta.Favorito != y.Meta.Favorito || x.VideoUrl != y.VideoUrl ||
                 x.CapaUrl != y.CapaUrl || x.TamanhoBytes != y.TamanhoBytes)
                 return false;
         }

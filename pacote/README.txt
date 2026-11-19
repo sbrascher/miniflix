@@ -37,7 +37,8 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
 
   IMPORTAR DO COMPUTADOR (funciona sem internet)
     1. Clique em "Escolher arquivos..." e selecione um ou mais vídeos.
-    2. Ajuste os títulos e escolha (ou digite) uma categoria.
+    2. Ajuste os títulos, escolha (ou digite) uma categoria e, se
+       quiser, coloque tags (valem para todos os vídeos escolhidos).
     3. Clique em "Adicionar à fila".
     Vídeos que o MiniFlix já toca (H.264, VP9 ou AV1 - inclusive os
     baixados do YouTube, em MP4, MKV ou WebM) são apenas copiados:
@@ -70,6 +71,12 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     Clique no nome de uma categoria para recolher (ou abrir de novo)
     os vídeos dela. "Recolher todas" / "Expandir todas" fica no alto.
     O MiniFlix lembra quais categorias você deixou recolhidas.
+
+  FAVORITOS
+    No player, clique em "Favorito" (estrela) ao lado do título. Os
+    favoritos ganham uma estrela na capa e aparecem na fileira
+    "Favoritos" do catálogo. Na Administração também há uma estrela
+    em cada vídeo da tabela.
 
   FILTRAR POR TAG
     Se os vídeos tiverem tags, elas aparecem no alto do catálogo.
@@ -121,6 +128,12 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     Em Editar, no campo "Tags", digite uma palavra e tecle Enter (ou
     vírgula). Um vídeo pode ter várias tags (até 20), por exemplo
     "iniciante" e "aula ao vivo". Para tirar uma tag, clique no X dela.
+
+  FILTRAR O ACERVO
+    Acima da tabela "Acervo" dá para filtrar por texto, por categoria,
+    por tags (o vídeo precisa ter todas as marcadas), por "Sem tags"
+    (vídeos que ainda não têm nenhuma) e por "Só favoritos". Os
+    filtros podem ser combinados; "Limpar filtros" desfaz tudo.
 
   TAGS EM VÁRIOS VÍDEOS DE UMA VEZ
     Na tabela "Acervo", marque as caixinhas à esquerda dos vídeos

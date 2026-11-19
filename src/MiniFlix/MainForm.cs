@@ -140,6 +140,12 @@ internal sealed class MainForm : Form
             var item = await Task.Run(() => _catalogo.Editar(slug, Campo("titulo"), Campo("categoria"), Campo("descricao"), tags));
             return ParaUi(item);
         });
+        _bridge.Registrar("video.favoritar", async d =>
+        {
+            var slug = Bridge.Texto(d, "slug");
+            var favorito = d?["favorito"]?.GetValue<bool>() ?? throw new ArgumentException("Parâmetro 'favorito' ausente.");
+            return (object?)ParaUi(await Task.Run(() => _catalogo.DefinirFavorito(slug, favorito)));
+        });
         _bridge.Registrar("videos.alterarTags", async d =>
         {
             static List<string?> Lista(JsonObject? d, string campo) =>
@@ -270,6 +276,8 @@ internal sealed class MainForm : Form
             var categoria = d?["categoria"]?.GetValue<string>() ?? "";
             if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException("Categoria muito longa.");
             var itens = d?["itens"] as JsonArray ?? throw new ArgumentException("Nenhum arquivo informado.");
+            // Valida as tags antes de enfileirar: o erro aparece no modal, não minutos depois na fila.
+            var tags = _catalogo.NormalizarTags((d?["tags"] as JsonArray)?.Select(t => t?.GetValue<string>()) ?? []);
             int n = 0;
             foreach (var no in itens)
             {
@@ -277,7 +285,7 @@ internal sealed class MainForm : Form
                 if (!_arquivosEscolhidos.Remove(token, out var caminho)) continue; // token desconhecido ou já usado
                 var titulo = no?["titulo"]?.GetValue<string>() ?? "";
                 if (titulo.Trim().Length > CatalogService.MaxTitulo) throw new ArgumentException("Título muito longo.");
-                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria));
+                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria, tags));
                 n++;
             }
             return new { adicionados = n };
@@ -395,6 +403,7 @@ internal sealed class MainForm : Form
         i.Meta.Descricao,
         i.Meta.Categoria,
         i.Meta.Tags,
+        i.Meta.Favorito,
         i.Meta.Origem,
         i.Meta.UrlOrigem,
         i.Meta.DuracaoSegundos,

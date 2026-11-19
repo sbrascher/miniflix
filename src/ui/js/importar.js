@@ -3,6 +3,7 @@ import { bridge } from './bridge.js';
 import { h, fmtBytes, plural } from './util.js';
 import { icone } from './icones.js';
 import { abrirModal, toast } from './componentes.js';
+import { campoTags } from './tags.js';
 
 /** Card "Importar do computador" da tela de administração. */
 export function cardImportar(estado) {
@@ -56,6 +57,7 @@ async function modalImportar(arquivos, estado) {
   const categoria = h('input', {
     id: 'imp-categoria', class: 'campo w-full', maxlength: 60, list: 'imp-categorias', autocomplete: 'off', placeholder: 'Sem categoria',
   });
+  const tags = campoTags({ id: 'imp-tags', sugestoes: estado.tags ?? [] });
   const erro = h('p', { class: 'alerta-erro hidden', role: 'alert' });
   const enviar = h('button', { type: 'submit', form: 'form-importar', class: 'btn-primario' },
     icone('playlist_add', 18), `Adicionar ${plural(arquivos.length, 'vídeo', 'vídeos')} à fila`);
@@ -71,6 +73,10 @@ async function modalImportar(arquivos, estado) {
         estado.categorias.filter((c) => c !== 'Sem categoria').map((c) => h('option', { value: c }))),
       h('p', { class: 'mt-1 text-xs text-suave' },
         arquivos.length > 1 ? 'Aplicada a todos os vídeos. ' : '', 'Escolha uma existente ou digite um nome novo.')),
+    h('div', {},
+      h('label', { for: 'imp-tags', class: 'rotulo' }, 'Tags ', h('span', { class: 'font-normal text-suave' }, '(opcional)')),
+      tags.el,
+      arquivos.length > 1 ? h('p', { class: 'mt-1 text-xs text-suave' }, 'Aplicadas a todos os vídeos.') : null),
     erro);
 
   const ok = abrirModal({
@@ -91,6 +97,7 @@ async function modalImportar(arquivos, estado) {
         try {
           await bridge.call('fila.adicionarLocal', {
             categoria: categoria.value,
+            tags: tags.valores(),
             itens: linhas.map((l) => ({ token: l.a.token, titulo: l.campo.value })),
           });
           fechar(true);

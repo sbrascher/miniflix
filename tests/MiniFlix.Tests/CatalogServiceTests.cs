@@ -377,6 +377,49 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Empty(Assert.Single(cat.Itens).Meta.Tags);
     }
 
+    // ---------- Favorito ----------
+
+    [Fact]
+    public void Favorito_e_gravado_e_preserva_os_outros_campos()
+    {
+        CriarVideo("v", titulo: "Meu vídeo");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("v", "Meu vídeo", "Cursos", "desc", ["python"]);
+
+        Assert.True(cat.DefinirFavorito("v", true).Meta.Favorito);
+        var meta = JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "v", "v.json"))!;
+        Assert.True(meta.Favorito);
+        Assert.Equal(["python"], meta.Tags);
+        Assert.Equal("desc", meta.Descricao);
+
+        // editar o vídeo não tira o favorito
+        Assert.True(cat.Editar("v", "Outro título", "Cursos", "", null).Meta.Favorito);
+        Assert.False(cat.DefinirFavorito("v", false).Meta.Favorito);
+        Assert.False(cat.DefinirFavorito("v", false).Meta.Favorito); // repetir não falha
+        Assert.ThrowsAny<Exception>(() => cat.DefinirFavorito("nao-existe", true));
+    }
+
+    [Fact]
+    public async Task Edicoes_simultaneas_no_mesmo_video_nao_se_perdem()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        // A ponte atende comandos em paralelo: favoritar e aplicar tags ao mesmo tempo não pode perder nada.
+        var tarefas = new List<Task>();
+        for (int i = 0; i < 20; i++)
+        {
+            var n = i;
+            tarefas.Add(Task.Run(() => cat.AlterarTagsEmMassa(["v"], [$"t{n}"], [])));
+            tarefas.Add(Task.Run(() => cat.DefinirFavorito("v", true)));
+        }
+        await Task.WhenAll(tarefas);
+        var meta = JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "v", "v.json"))!;
+        Assert.True(meta.Favorito);
+        Assert.Equal(20, meta.Tags.Count);
+    }
+
     // ---------- Tags em massa ----------
 
     private List<string> TagsNoDisco(string slug) =>

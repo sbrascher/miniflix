@@ -662,6 +662,24 @@
   .card-continuar:hover > .card-video::after,
   .card-continuar:focus-within > .card-video::after { opacity: 1; }
 
+  /* Estrela de favorito sobre a capa (só indicação; marcar/desmarcar é no player e na administração). */
+  .selo-favorito {
+    position: absolute;
+    left: 0.5rem;
+    bottom: 0.5rem;
+    display: inline-flex;
+    padding: 0.2rem;
+    border-radius: 999px;
+    color: #ffc94a;
+    background: rgb(18 20 24 / 0.78);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.35);
+  }
+  .card-video-capa:has(.card-video-progresso) .selo-favorito { bottom: 1.2rem; }
+
+  /* Botão de favoritar (estrela): vazio = não favorito; cheio e dourado = favorito. */
+  .btn-favorito[aria-pressed=true] { color: #a86f00; }   /* ≥ 3:1 sobre o fundo claro */
+  [data-theme=escuro] .btn-favorito[aria-pressed=true] { color: #ffc94a; }
+
   .card-remover {
     position: absolute;
     top: 1rem;

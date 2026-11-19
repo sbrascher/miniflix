@@ -65,6 +65,8 @@ export function cardVideo(v, { mostrarCategoria = false, mostrarRestante = false
       imagemCapa(v),
       p?.assistido && !andamento
         ? h('span', { class: 'selo-assistido' }, icone('check_circle', 14, true), 'Assistido') : null,
+      v.favorito ? h('span', { class: 'selo-favorito', title: 'Favorito' },
+        icone('star', 16, true), h('span', { class: 'sr-only' }, 'Favorito')) : null,
       duracao ? h('span', { class: 'selo-duracao' }, h('span', { class: 'sr-only' }, 'Duração: '), duracao) : null,
       andamento
         ? h('div', { class: 'card-video-progresso', role: 'img', 'aria-label': `${pct}% assistido` },
@@ -231,6 +233,14 @@ export function renderCatalogo(raiz, { videos, categorias, tags = [], tagsSeleci
         icone: 'history',
         montarCard: (v, i) => cardContinuar(v, i, aoAlterarProgresso),
         chave: recolhivel ? 'continuar-assistindo' : null,
+        aoAlternar: () => atualizarBotaoTodas(),
+      }));
+    }
+    const favoritos = filtrados.filter((v) => v.favorito);
+    if (favoritos.length && !categoria) {
+      secoes.push(secao('Favoritos', favoritos, 'secao-favoritos', {
+        icone: 'star',
+        chave: 'favoritos',
         aoAlternar: () => atualizarBotaoTodas(),
       }));
     }

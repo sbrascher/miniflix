@@ -237,7 +237,7 @@ internal sealed class MainForm : Form
         // ---- Ferramentas, importação e fila ----
         _bridge.Registrar("sistema.ferramentas", _ => Ferramentas.Situacao());
 
-        _bridge.Registrar("importar.escolherArquivos", _ =>
+        _bridge.Registrar("importar.escolherArquivos", async _ =>
         {
             var filtro = string.Join(';', ImportacaoLocal.Extensoes.Select(x => "*" + x));
             using var dlg = new OpenFileDialog
@@ -254,16 +254,46 @@ internal sealed class MainForm : Form
             else if (dlg.ShowDialog(this) == DialogResult.OK) escolhidos = dlg.FileNames;
             else return Array.Empty<object>();
 
-            return escolhidos.Select(caminho =>
+            // Analisa cada arquivo (ffprobe, rápido) para o modal mostrar, antes de confirmar,
+            // o que será copiado sem perda e o que precisa ser reconvertido.
+            using var limite = new SemaphoreSlim(4);
+            var itens = await Task.WhenAll(escolhidos.Select(async caminho =>
             {
                 var token = Guid.NewGuid().ToString("N");
-                _arquivosEscolhidos[token] = caminho;
+                object? analise = null;
+                await limite.WaitAsync();
+                try
+                {
+                    var info = await Ffmpeg.AnalisarAsync(caminho, CancellationToken.None);
+                    if (info.TemVideo)
+                        analise = new
+                        {
+                            tratamento = info.Tratamento() switch
+                            {
+                                Tratamento.CopiarTudo => "copiar",
+                                Tratamento.ConverterSoAudio => "audio",
+                                _ => "converter",
+                            },
+                            codec = info.NomeCodecVideo,
+                            largura = info.Largura,
+                            altura = info.Altura,
+                        };
+                }
+                catch (Exception ex) { Log.Aviso($"Análise prévia falhou para {caminho}: {ex.Message}"); } // o erro aparece na fila
+                finally { limite.Release(); }
+                return (token, caminho, analise);
+            }));
+
+            return itens.Select(i =>
+            {
+                _arquivosEscolhidos[i.token] = i.caminho;
                 return (object)new
                 {
-                    token,
-                    nome = Path.GetFileName(caminho),
-                    tamanhoBytes = new FileInfo(caminho).Length,
-                    tituloSugerido = ImportacaoLocal.TituloSugerido(caminho),
+                    i.token,
+                    nome = Path.GetFileName(i.caminho),
+                    tamanhoBytes = new FileInfo(i.caminho).Length,
+                    tituloSugerido = ImportacaoLocal.TituloSugerido(i.caminho),
+                    i.analise,
                 };
             }).ToArray();
         });
@@ -278,6 +308,7 @@ internal sealed class MainForm : Form
             var itens = d?["itens"] as JsonArray ?? throw new ArgumentException("Nenhum arquivo informado.");
             // Valida as tags antes de enfileirar: o erro aparece no modal, não minutos depois na fila.
             var tags = _catalogo.NormalizarTags((d?["tags"] as JsonArray)?.Select(t => t?.GetValue<string>()) ?? []);
+            var reduzirPara1080 = d?["reduzirPara1080"]?.GetValue<bool>() ?? false;
             int n = 0;
             foreach (var no in itens)
             {
@@ -285,7 +316,7 @@ internal sealed class MainForm : Form
                 if (!_arquivosEscolhidos.Remove(token, out var caminho)) continue; // token desconhecido ou já usado
                 var titulo = no?["titulo"]?.GetValue<string>() ?? "";
                 if (titulo.Trim().Length > CatalogService.MaxTitulo) throw new ArgumentException("Título muito longo.");
-                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria, tags));
+                _fila.Adicionar(_importacao.CriarItem(caminho, titulo, categoria, tags, reduzirPara1080));
                 n++;
             }
             return new { adicionados = n };

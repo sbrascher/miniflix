@@ -53,11 +53,11 @@ public sealed class ImportacaoLocalTests : IDisposable
     }
 
     private async Task<(FilaService fila, CatalogService cat)> Importar(string arquivo, string titulo, string categoria,
-        IReadOnlyList<string>? tags = null)
+        IReadOnlyList<string>? tags = null, bool reduzirPara1080 = false)
     {
         var cat = new CatalogService(Videos, Path.Combine(_raiz, "cache.json"), p => p);
         var fila = new FilaService();
-        fila.Adicionar(new ImportacaoLocal(cat).CriarItem(arquivo, titulo, categoria, tags));
+        fila.Adicionar(new ImportacaoLocal(cat).CriarItem(arquivo, titulo, categoria, tags, reduzirPara1080));
         var fim = DateTime.Now.AddSeconds(60);
         while (fila.Ocupada && DateTime.Now < fim) await Task.Delay(50);
         return (fila, cat);
@@ -73,7 +73,7 @@ public sealed class ImportacaoLocalTests : IDisposable
         var item = Assert.Single(fila.Itens);
         Assert.Equal(EstadoFila.Concluido, item.Estado);
         Assert.Equal("aula-01-introducao", item.Slug);
-        Assert.Contains("sem conversão", item.Mensagem);
+        Assert.Contains("sem perda", item.Mensagem);
 
         var dir = Path.Combine(Videos, "aula-01-introducao");
         Assert.True(File.Exists(Path.Combine(dir, "aula-01-introducao.mp4")));
@@ -100,6 +100,52 @@ public sealed class ImportacaoLocalTests : IDisposable
             JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "com-tags", "com-tags.json"))!.Tags);
     }
 
+    /// <summary>Hash do conteúdo da trilha de vídeo (pacotes), para provar que ela foi copiada bit a bit.</summary>
+    private static async Task<string> HashDoVideo(string arquivo)
+    {
+        var saida = new System.Text.StringBuilder();
+        var r = await Processo.ExecutarAsync(Ferramentas.Ffmpeg!,
+            ["-hide_banner", "-loglevel", "error", "-i", arquivo, "-map", "0:v:0", "-c", "copy", "-f", "hash", "-hash", "md5", "-"],
+            CancellationToken.None, aoLerSaida: l => saida.AppendLine(l));
+        Assert.Equal(0, r.CodigoSaida);
+        return saida.ToString().Trim();
+    }
+
+    [Fact]
+    public async Task Video_compativel_e_copiado_bit_a_bit()
+    {
+        if (!TemFfmpeg) return;
+        var mp4 = await GerarVideo("original.mp4", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
+        var (fila, _) = await Importar(mp4, "Original", "");
+        Assert.Equal(EstadoFila.Concluido, Assert.Single(fila.Itens).Estado);
+        Assert.Equal(await HashDoVideo(mp4), await HashDoVideo(Path.Combine(Videos, "original", "original.mp4")));
+    }
+
+    [Fact]
+    public async Task Audio_incompativel_vira_flac_e_o_video_e_copiado_sem_perda()
+    {
+        if (!TemFfmpeg) return;
+        // MKV de câmera/filme: H.264 4:2:2 + AC3 5.1. Antes, o vídeo inteiro era reconvertido por causa do áudio.
+        var destino = Path.Combine(Origem, "filme.mkv");
+        var r = await Processo.ExecutarAsync(Ferramentas.Ffmpeg!, ["-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=15", "-f", "lavfi", "-i", "sine", "-t", "1",
+            "-filter_complex", "[1:a]pan=5.1|c0=c0|c1=c0|c2=c0|c3=c0|c4=c0|c5=c0[a]", "-map", "0:v", "-map", "[a]",
+            "-c:v", "libx264", "-pix_fmt", "yuv422p", "-c:a", "ac3", destino], CancellationToken.None);
+        Assert.Equal(0, r.CodigoSaida);
+
+        var (fila, _) = await Importar(destino, "Filme", "");
+        var item = Assert.Single(fila.Itens);
+        Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
+        Assert.Contains("áudio convertido para FLAC", item.Mensagem);
+        var saida = Path.Combine(Videos, "filme", "filme.mp4");
+        var info = await Ffmpeg.AnalisarAsync(saida, CancellationToken.None);
+        Assert.Equal("h264", info.CodecVideo);
+        Assert.Equal("yuv422p", info.PixFmt);
+        Assert.Equal("flac", info.CodecAudio);
+        Assert.Equal(6, info.Canais);                                  // 5.1 preservado
+        Assert.Equal(await HashDoVideo(destino), await HashDoVideo(saida)); // vídeo idêntico
+    }
+
     [Fact]
     public async Task Avi_e_convertido_para_h264_aac()
     {
@@ -114,7 +160,7 @@ public sealed class ImportacaoLocalTests : IDisposable
 
         var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, "antigo", "antigo.mp4"), CancellationToken.None);
         Assert.Equal("h264", info.CodecVideo);
-        Assert.Equal("aac", info.CodecAudio);
+        Assert.Equal("mp3", info.CodecAudio); // o áudio MP3 já tocava: copiado, não reconvertido
         Assert.True(info.CompativelSemConverter);
     }
 
@@ -127,29 +173,49 @@ public sealed class ImportacaoLocalTests : IDisposable
         var (fila, _) = await Importar(mkv, "Baixado do YouTube", "");
         var item = Assert.Single(fila.Itens);
         Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
-        Assert.Contains("sem conversão", item.Mensagem);
+        Assert.Contains("sem perda", item.Mensagem);
         var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, item.Slug!, item.Slug + ".mp4"), CancellationToken.None);
         Assert.Equal("vp9", info.CodecVideo);   // mesma trilha, só mudou o contêiner
         Assert.Equal("opus", info.CodecAudio);
     }
 
-    [Fact]
-    public async Task Hevc_e_convertido_para_h264_e_limitado_a_1080p()
+    private async Task<string> GerarHevc(string nome, string pix = "yuv420p")
     {
-        if (!TemFfmpeg) return;
-        // 2560×1440 em HEVC: precisa converter (o player não mostra a imagem) e reduzir para caber em 1080p.
-        var destino = Path.Combine(Origem, "hevc.mp4");
+        // 2560×1440 em HEVC: precisa converter (o player não mostra a imagem).
+        var destino = Path.Combine(Origem, nome);
         var r = await Processo.ExecutarAsync(Ferramentas.Ffmpeg!, ["-hide_banner", "-loglevel", "error", "-y",
             "-f", "lavfi", "-i", "testsrc2=size=2560x1440:rate=15", "-f", "lavfi", "-i", "sine", "-t", "1",
-            "-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "log-level=error", "-c:a", "aac", destino], CancellationToken.None);
+            "-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt", pix, "-x265-params", "log-level=error", "-c:a", "aac", destino],
+            CancellationToken.None);
         Assert.Equal(0, r.CodigoSaida);
+        return destino;
+    }
 
-        var (fila, _) = await Importar(destino, "HEVC", "");
+    [Fact]
+    public async Task Hevc_e_convertido_em_alta_qualidade_na_resolucao_original()
+    {
+        if (!TemFfmpeg) return;
+        var (fila, _) = await Importar(await GerarHevc("hevc.mp4", "yuv420p10le"), "HEVC", "");
         var item = Assert.Single(fila.Itens);
         Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
-        Assert.Contains("Convertido", item.Mensagem);
+        Assert.Equal("Convertido de HEVC/H.265 para H.264 em alta qualidade, na resolução original.", item.Mensagem);
         var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, item.Slug!, item.Slug + ".mp4"), CancellationToken.None);
         Assert.Equal("h264", info.CodecVideo);
+        Assert.Equal(2560, info.Largura);           // sem reduzir
+        Assert.Equal(1440, info.Altura);
+        Assert.Equal("yuv420p10le", info.PixFmt);   // 10 bits preservados
+        Assert.Equal("aac", info.CodecAudio);       // áudio compatível: copiado
+    }
+
+    [Fact]
+    public async Task Hevc_com_opcao_de_reduzir_fica_em_1080p()
+    {
+        if (!TemFfmpeg) return;
+        var (fila, _) = await Importar(await GerarHevc("hevc-menor.mp4"), "HEVC menor", "", reduzirPara1080: true);
+        var item = Assert.Single(fila.Itens);
+        Assert.True(item.Estado == EstadoFila.Concluido, item.Mensagem);
+        Assert.Contains("reduzido para 1080p", item.Mensagem);
+        var info = await Ffmpeg.AnalisarAsync(Path.Combine(Videos, item.Slug!, item.Slug + ".mp4"), CancellationToken.None);
         Assert.Equal(1920, info.Largura);
         Assert.Equal(1080, info.Altura);
     }

@@ -109,11 +109,12 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
                 .FirstOrDefault(f => !f.EndsWith(".jpg") && !f.EndsWith(".webp") && !f.EndsWith(".part") && !f.EndsWith(".ytdl"))
                 ?? throw new InvalidOperationException("O download terminou, mas o arquivo de vídeo não foi encontrado.");
 
-            // 3. Garante MP4 H.264/AAC com faststart (normalmente só copia as trilhas)
+            // 3. Garante um MP4 que o player toca, com faststart (normalmente só copia as trilhas)
             relator.Etapa("Finalizando MP4", 0.85, 0.96);
             var info = await Ffmpeg.AnalisarAsync(baixado, ct);
             var mp4 = Path.Combine(pasta, "video.mp4");
-            await Ffmpeg.ConverterParaMp4Async(baixado, mp4, info, converter: !info.CompativelSemConverter, relator.Progresso, ct);
+            // O download já vem em até 1080p; se precisar reconverter, mantém esse limite.
+            await Ffmpeg.ConverterParaMp4Async(baixado, mp4, info, reduzirPara1080: true, relator.Progresso, ct);
             File.Delete(baixado);
 
             // 4. Capa: miniatura do YouTube ou, na falta dela, um quadro do vídeo

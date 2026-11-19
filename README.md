@@ -20,7 +20,7 @@
 - ▶️ **Player** completo: velocidade de reprodução, tela cheia e atalhos de teclado no estilo do YouTube (`Espaço`, `J`/`L`, setas, `F`, `M`, `0`–`9`).
 - ⏯️ **Continuar assistindo:** o MiniFlix lembra onde você parou em cada vídeo.
 - ⬇️ **Adicionar do YouTube** colando a URL. A fila baixa um vídeo por vez e mostra o progresso em tempo real.
-- 📁 **Importar vídeos do computador**, convertendo para MP4 só quando necessário.
+- 📁 **Importar vídeos do computador** sem perder qualidade: o que o player toca é copiado bit a bit; áudio incompatível vira FLAC (sem perda); só vídeos que não tocam (HEVC, WMV…) são reconvertidos, em alta qualidade e na resolução original.
 - 🗂️ **Gerenciar o acervo:** editar título, categoria, tags e descrição, ou excluir vídeos.
 - ✏️ **Renomear categoria:** muda todos os vídeos dela de uma vez (ou une com uma categoria existente).
 - ⭐ **Favoritos:** estrela no player e na administração; os favoritos ganham uma fileira própria no catálogo.

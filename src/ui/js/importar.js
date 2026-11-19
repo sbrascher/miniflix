@@ -36,8 +36,20 @@ export function cardImportar(estado) {
     h('div', {},
       h('h2', { class: 'font-semibold' }, 'Importar do computador'),
       h('p', { class: 'mt-1 text-sm text-suave' },
-        'Escolha um ou mais vídeos do PC. Vídeos em H.264, VP9 ou AV1 (inclusive os baixados do YouTube) são copiados em segundos; os demais são convertidos para MP4.'),
+        'Escolha um ou mais vídeos do PC. Vídeos em H.264, VP9 ou AV1 (inclusive os baixados do YouTube) são copiados sem perda de qualidade, em segundos; os demais são convertidos em alta qualidade.'),
       botao, aviso));
+}
+
+/** O que vai acontecer com o arquivo (vem da análise feita ao escolher), com ícone e cor. */
+function seloTratamento(analise) {
+  if (!analise) return null;
+  const [icon, cor, texto] = {
+    copiar: ['check_circle', 'text-sucesso', 'Sem perda: o vídeo é copiado como está'],
+    audio: ['check_circle', 'text-sucesso', 'Vídeo copiado sem perda; o áudio vira FLAC (também sem perda)'],
+    converter: ['autorenew', 'text-aviso', `Precisa converter (${analise.codec}): alta qualidade, pode demorar`],
+  }[analise.tratamento];
+  return h('p', { class: `mt-1.5 flex items-center gap-1.5 text-xs font-medium ${cor}` },
+    icone(icon, 15, true), h('span', {}, texto));
 }
 
 async function modalImportar(arquivos, estado) {
@@ -50,7 +62,8 @@ async function modalImportar(arquivos, estado) {
       el: h('li', { class: 'py-3.5 first:pt-1 last:pb-1' },
         h('label', { for: `imp-titulo-${idx}`, class: 'mb-1.5 flex items-center gap-2 text-xs text-suave' },
           icone('movie', 14), h('span', { class: 'truncate' }, a.nome), h('span', { class: 'shrink-0' }, `· ${fmtBytes(a.tamanhoBytes)}`)),
-        campo),
+        campo,
+        seloTratamento(a.analise)),
     };
   });
 
@@ -58,6 +71,19 @@ async function modalImportar(arquivos, estado) {
     id: 'imp-categoria', class: 'campo w-full', maxlength: 60, list: 'imp-categorias', autocomplete: 'off', placeholder: 'Sem categoria',
   });
   const tags = campoTags({ id: 'imp-tags', sugestoes: estado.tags ?? [] });
+
+  // Reduzir para 1080p só faz sentido para vídeos que serão reconvertidos e são maiores que isso.
+  const grandes = arquivos.filter((a) => a.analise?.tratamento === 'converter' && (a.analise.largura > 1920 || a.analise.altura > 1080));
+  const reduzir = h('input', { id: 'imp-reduzir', type: 'checkbox', class: 'caixa-selecao mt-0.5 shrink-0' });
+  const opcaoReduzir = grandes.length
+    ? h('div', { class: 'bandeja flex gap-3 px-4 py-3' },
+        reduzir,
+        h('label', { for: 'imp-reduzir', class: 'cursor-pointer text-sm' },
+          h('span', { class: 'font-semibold' }, 'Reduzir para 1080p'),
+          h('span', { class: 'block text-xs text-suave' },
+            `${plural(grandes.length, 'vídeo precisa', 'vídeos precisam')} de conversão e ${grandes.length > 1 ? 'são maiores' : 'é maior'} que 1080p. `,
+            'Reduzir deixa o arquivo menor e a conversão mais rápida, mas perde detalhe. Desmarcado = mantém a resolução original.')))
+    : null;
   const erro = h('p', { class: 'alerta-erro hidden', role: 'alert' });
   const enviar = h('button', { type: 'submit', form: 'form-importar', class: 'btn-primario' },
     icone('playlist_add', 18), `Adicionar ${plural(arquivos.length, 'vídeo', 'vídeos')} à fila`);
@@ -77,6 +103,7 @@ async function modalImportar(arquivos, estado) {
       h('label', { for: 'imp-tags', class: 'rotulo' }, 'Tags ', h('span', { class: 'font-normal text-suave' }, '(opcional)')),
       tags.el,
       arquivos.length > 1 ? h('p', { class: 'mt-1 text-xs text-suave' }, 'Aplicadas a todos os vídeos.') : null),
+    opcaoReduzir,
     erro);
 
   const ok = abrirModal({
@@ -98,6 +125,7 @@ async function modalImportar(arquivos, estado) {
           await bridge.call('fila.adicionarLocal', {
             categoria: categoria.value,
             tags: tags.valores(),
+            reduzirPara1080: reduzir.checked,
             itens: linhas.map((l) => ({ token: l.a.token, titulo: l.campo.value })),
           });
           fechar(true);

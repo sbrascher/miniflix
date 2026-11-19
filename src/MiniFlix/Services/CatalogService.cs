@@ -202,6 +202,49 @@ public sealed class CatalogService
     }
 
     /// <summary>
+    /// Troca a categoria de todos os vídeos de <paramref name="antiga"/> para <paramref name="nova"/>.
+    /// Se <paramref name="nova"/> já existir (outra categoria), as duas são unidas usando a grafia existente;
+    /// vazia ou "Sem categoria" tira a categoria dos vídeos. Retorna quantos vídeos foram alterados.
+    /// </summary>
+    public int RenomearCategoria(string antiga, string? nova)
+    {
+        antiga = (antiga ?? "").Trim();
+        nova = (nova ?? "").Trim();
+        if (nova.Length > MaxCategoria) throw new ArgumentException($"A categoria pode ter no máximo {MaxCategoria} caracteres.");
+        if (nova.Equals(SemCategoria, StringComparison.OrdinalIgnoreCase)) nova = "";
+
+        // Une com outra categoria existente reaproveitando a grafia dela; mudar só maiúsculas/minúsculas da própria vale.
+        var existente = Categorias().FirstOrDefault(c => c != SemCategoria &&
+            c.Equals(nova, StringComparison.OrdinalIgnoreCase) && !c.Equals(antiga, StringComparison.OrdinalIgnoreCase));
+        if (existente is not null) nova = existente;
+
+        var alvo = Itens.Where(i => i.Meta.Categoria.Equals(antiga, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (alvo.Count == 0) throw new KeyNotFoundException($"A categoria “{antiga}” não existe mais.");
+        if (nova == (antiga == SemCategoria ? "" : antiga)) return 0; // nada muda
+
+        int alterados = 0;
+        try
+        {
+            foreach (var item in alvo)
+            {
+                // Lê do disco (o item em memória tem campos preenchidos para exibição, como "Sem categoria").
+                var arquivo = Path.Combine(PastaDoVideo(item.Meta.Slug), item.Meta.Slug + ".json");
+                var meta = JsonStore.Ler<VideoMeta>(arquivo);
+                if (meta is null) continue;
+                meta.Categoria = nova;
+                JsonStore.Gravar(arquivo, meta);
+                alterados++;
+            }
+        }
+        finally
+        {
+            Log.Info($"Categoria “{antiga}” → “{(nova.Length == 0 ? SemCategoria : nova)}”: {alterados} vídeo(s).");
+            Varrer(); // mesmo se falhar no meio, o catálogo mostra o que já foi gravado
+        }
+        return alterados;
+    }
+
+    /// <summary>
     /// Apaga a pasta do vídeo. Primeiro renomeia a pasta (operação atômica que falha se algum arquivo
     /// estiver em uso), então nunca sobra um vídeo "meio apagado" no catálogo.
     /// </summary>

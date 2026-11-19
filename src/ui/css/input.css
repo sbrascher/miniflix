@@ -402,6 +402,37 @@
   }
   .chip-pequeno { padding: 0.1rem 0.55rem; font-size: 0.7rem; font-weight: 500; }
 
+  /* ---------- Seções do catálogo (acordeão) ---------- */
+  .secao { margin-bottom: 3.5rem; }
+  .secao > h2 { margin-bottom: 1.25rem; }
+  .secao[data-recolhida] { margin-bottom: 1.75rem; }
+  .secao[data-recolhida] > h2 { margin-bottom: 0; }
+
+  /* O título inteiro é o botão: área de clique grande, sem cara de botão até o hover. */
+  .secao-alternar {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: -0.75rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--raio-md);
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: box-shadow var(--rapido) var(--ease), color var(--rapido), background-color var(--rapido);
+  }
+  .secao-alternar:hover { background: var(--superficie-2); box-shadow: var(--relevo-1); }
+  .secao-alternar:active { box-shadow: var(--afundar-leve); }
+  .secao-alternar:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+  .secao-seta {
+    display: flex;
+    color: var(--suave);
+    transition: transform 200ms var(--ease);
+  }
+  .secao-alternar:hover .secao-seta { color: var(--destaque); }
+  .secao[data-recolhida] .secao-seta { transform: rotate(-90deg); }
+
   /* ---------- Tags ---------- */
   /* Chip que liga/desliga um filtro (catálogo) ou leva ao catálogo filtrado (player). */
   .chip-filtro {

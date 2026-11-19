@@ -377,6 +377,69 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Empty(Assert.Single(cat.Itens).Meta.Tags);
     }
 
+    // ---------- Renomear categoria ----------
+
+    private string CategoriaNoDisco(string slug) =>
+        JsonStore.Ler<VideoMeta>(Path.Combine(Videos, slug, slug + ".json"))!.Categoria;
+
+    [Fact]
+    public void RenomearCategoria_muda_todos_os_videos_dela()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "cursos");   // mesma categoria com outra grafia
+        CriarVideo("c", categoria: "Receitas");
+        var cat = Novo();
+        cat.Varrer();
+
+        Assert.Equal(2, cat.RenomearCategoria("Cursos", "  Aulas  "));
+        Assert.Equal("Aulas", CategoriaNoDisco("a"));
+        Assert.Equal("Aulas", CategoriaNoDisco("b"));
+        Assert.Equal("Receitas", CategoriaNoDisco("c"));
+        Assert.Equal(["Aulas", "Receitas"], cat.Categorias());
+    }
+
+    [Fact]
+    public void RenomearCategoria_para_existente_une_com_a_grafia_dela()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "Aulas");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal(1, cat.RenomearCategoria("Cursos", "AULAS"));
+        Assert.Equal("Aulas", CategoriaNoDisco("a"));
+        Assert.Equal(["Aulas"], cat.Categorias());
+    }
+
+    [Fact]
+    public void RenomearCategoria_so_maiusculas_e_sem_categoria()
+    {
+        CriarVideo("a", categoria: "cursos");
+        CriarVideo("b", categoria: "");
+        var cat = Novo();
+        cat.Varrer();
+
+        Assert.Equal(1, cat.RenomearCategoria("cursos", "Cursos"));
+        Assert.Equal("Cursos", CategoriaNoDisco("a"));
+
+        // dar categoria aos vídeos sem categoria, e depois tirar de volta
+        Assert.Equal(1, cat.RenomearCategoria(CatalogService.SemCategoria, "Diversos"));
+        Assert.Equal("Diversos", CategoriaNoDisco("b"));
+        Assert.Equal(1, cat.RenomearCategoria("Diversos", ""));
+        Assert.Equal("", CategoriaNoDisco("b")); // grava vazio, não o texto "Sem categoria"
+        Assert.Equal(0, cat.RenomearCategoria("Cursos", "Cursos"));
+    }
+
+    [Fact]
+    public void RenomearCategoria_invalida()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Throws<KeyNotFoundException>(() => cat.RenomearCategoria("Não existe", "X"));
+        Assert.Throws<ArgumentException>(() => cat.RenomearCategoria("Cursos", new string('x', CatalogService.MaxCategoria + 1)));
+        Assert.Equal("Cursos", CategoriaNoDisco("a"));
+    }
+
     // ---------- Pasta configurável ----------
 
     [Fact]

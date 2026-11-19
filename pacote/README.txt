@@ -64,6 +64,11 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   Clique em qualquer capa. Use a busca (tecla / ) e o filtro de
   categoria no topo para encontrar vídeos.
 
+  RECOLHER CATEGORIAS
+    Clique no nome de uma categoria para recolher (ou abrir de novo)
+    os vídeos dela. "Recolher todas" / "Expandir todas" fica no alto.
+    O MiniFlix lembra quais categorias você deixou recolhidas.
+
   FILTRAR POR TAG
     Se os vídeos tiverem tags, elas aparecem no alto do catálogo.
     Clique numa tag para ver só os vídeos com ela; clique em outras
@@ -102,6 +107,13 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   Na Administração, a tabela "Acervo" lista todos os vídeos. Ali você
   pode assistir, editar (título, categoria, tags e descrição) ou
   excluir. A exclusão apaga o vídeo do disco e não pode ser desfeita.
+
+  RENOMEAR UMA CATEGORIA
+    No painel "Categorias" da Administração, clique no lápis ao lado
+    da categoria e digite o novo nome: todos os vídeos dela mudam de
+    uma vez. Se o nome já for de outra categoria, as duas viram uma
+    só. Em "Sem categoria", o lápis dá uma categoria a todos os vídeos
+    que ainda não têm.
 
   TAGS
     Em Editar, no campo "Tags", digite uma palavra e tecle Enter (ou

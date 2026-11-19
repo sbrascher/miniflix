@@ -16,12 +16,13 @@
 
 ## Funcionalidades planejadas
 
-- 📚 **Catálogo** com capas, busca em tempo real e vídeos agrupados por categoria.
+- 📚 **Catálogo** com capas, busca em tempo real e vídeos agrupados por categoria (seções recolhíveis, lembradas entre sessões).
 - ▶️ **Player** completo: velocidade de reprodução, tela cheia e atalhos de teclado no estilo do YouTube (`Espaço`, `J`/`L`, setas, `F`, `M`, `0`–`9`).
 - ⏯️ **Continuar assistindo:** o MiniFlix lembra onde você parou em cada vídeo.
 - ⬇️ **Adicionar do YouTube** colando a URL. A fila baixa um vídeo por vez e mostra o progresso em tempo real.
 - 📁 **Importar vídeos do computador**, convertendo para MP4 só quando necessário.
 - 🗂️ **Gerenciar o acervo:** editar título, categoria, tags e descrição, ou excluir vídeos.
+- ✏️ **Renomear categoria:** muda todos os vídeos dela de uma vez (ou une com uma categoria existente).
 - 🏷️ **Tags:** cada vídeo pode ter várias tags; o catálogo filtra por uma ou mais delas (o vídeo precisa ter todas).
 - 📁 **Pasta dos vídeos configurável:** o acervo pode ficar em qualquer pasta (outro disco, HD externo); a escolha é salva em `data\settings.json`.
 - 🌗 **Modo claro e modo escuro.**

@@ -79,12 +79,58 @@ const grade = (filhos) => h('div', {
   class: 'grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
 }, filhos);
 
-function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard } = {}) {
-  return h('section', { class: 'mb-14', 'aria-labelledby': id },
-    h('h2', { id, class: 'mb-5 flex items-center gap-3 font-display text-xl font-bold' },
-      nomeIcone ? h('span', { class: 'flex text-destaque' }, icone(nomeIcone, 24)) : null,
-      titulo, h('span', { class: 'chip font-medium text-suave' }, plural(videos.length, 'vídeo', 'vídeos'))),
-    grade(videos.map((v, i) => (montarCard ? montarCard(v, i) : cardVideo(v, opcoesCard)))));
+// ---------- Seções recolhíveis (acordeão) ----------
+// Quais seções o usuário recolheu ficam no localStorage: é uma conveniência de quem usa este PC,
+// e o catálogo funciona normalmente (tudo aberto) se o armazenamento falhar.
+const CHAVE_RECOLHIDAS = 'miniflix.secoesRecolhidas';
+
+function lerRecolhidas() {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_RECOLHIDAS) ?? '[]');
+    return new Set(Array.isArray(v) ? v : []);
+  } catch { return new Set(); }
+}
+function salvarRecolhidas(conjunto) {
+  try { localStorage.setItem(CHAVE_RECOLHIDAS, JSON.stringify([...conjunto])); } catch { /* ignora */ }
+}
+
+/** Abre/fecha uma seção já desenhada (sem redesenhar o catálogo) e lembra a escolha. */
+function definirRecolhida(el, recolher) {
+  el.toggleAttribute('data-recolhida', recolher);
+  el.querySelector('.secao-alternar').setAttribute('aria-expanded', String(!recolher));
+  el.querySelector('.secao-conteudo').hidden = recolher;
+  const recolhidas = lerRecolhidas();
+  if (recolher) recolhidas.add(el.dataset.chave); else recolhidas.delete(el.dataset.chave);
+  salvarRecolhidas(recolhidas);
+}
+
+/**
+ * Seção com título e grade de cards. Com `chave`, o título vira um botão que recolhe/expande
+ * a grade (aria-expanded + aria-controls); sem `chave`, é um título comum.
+ */
+function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard, chave, aoAlternar } = {}) {
+  const recolhida = chave != null && lerRecolhidas().has(chave);
+  const corpo = grade(videos.map((v, i) => (montarCard ? montarCard(v, i) : cardVideo(v, opcoesCard))));
+  corpo.id = `${id}-conteudo`;
+  corpo.classList.add('secao-conteudo');
+  corpo.hidden = recolhida;
+
+  const conteudoTitulo = [
+    nomeIcone ? h('span', { class: 'flex text-destaque' }, icone(nomeIcone, 24)) : null,
+    h('span', {}, titulo),
+    h('span', { class: 'chip font-medium text-suave' }, plural(videos.length, 'vídeo', 'vídeos')),
+  ];
+
+  const el = h('section', { class: 'secao', 'aria-labelledby': id, 'data-chave': chave, 'data-recolhida': recolhida },
+    h('h2', { id, class: 'font-display text-xl font-bold' },
+      chave == null
+        ? h('span', { class: 'flex items-center gap-3' }, conteudoTitulo)
+        : h('button', {
+            type: 'button', class: 'secao-alternar', 'aria-expanded': String(!recolhida), 'aria-controls': corpo.id,
+            onclick: () => { definirRecolhida(el, !el.hasAttribute('data-recolhida')); aoAlternar?.(); },
+          }, conteudoTitulo, h('span', { class: 'secao-seta' }, icone('expand_more', 24)))),
+    corpo);
+  return el;
 }
 
 /**
@@ -169,19 +215,47 @@ export function renderCatalogo(raiz, { videos, categorias, tags = [], tagsSeleci
             : 'Tente outras palavras, outra tag ou limpe o filtro de categoria.'));
   } else {
     // "Continuar assistindo" só na visão geral (sem filtro de categoria).
+    // Com uma categoria escolhida no filtro há uma seção só: não faz sentido recolhê-la.
+    const recolhivel = !categoria;
+    const secoes = [];
     const continuar = categoria ? [] : listaContinuar(videos);
     if (continuar.length) {
-      conteudo.append(secao('Continuar assistindo', continuar, 'secao-continuar', {
+      secoes.push(secao('Continuar assistindo', continuar, 'secao-continuar', {
         icone: 'history',
         montarCard: (v, i) => cardContinuar(v, i, aoAlterarProgresso),
+        chave: recolhivel ? 'continuar-assistindo' : null,
+        aoAlternar: () => atualizarBotaoTodas(),
       }));
     }
     categorias
       .filter((c) => !categoria || c === categoria)
       .forEach((c, i) => {
         const lista = filtrados.filter((v) => v.categoria === c);
-        if (lista.length) conteudo.append(secao(c, lista, `secao-${i}`));
+        if (lista.length) {
+          secoes.push(secao(c, lista, `secao-${i}`, {
+            chave: recolhivel ? `categoria:${c}` : null,
+            aoAlternar: () => atualizarBotaoTodas(),
+          }));
+        }
       });
+
+    // "Recolher todas / Expandir todas" quando há mais de uma seção.
+    const btnTodas = h('button', { type: 'button', class: 'btn' });
+    function atualizarBotaoTodas() {
+      const todasRecolhidas = secoes.every((s) => s.hasAttribute('data-recolhida'));
+      btnTodas.replaceChildren(icone(todasRecolhidas ? 'unfold_more' : 'unfold_less', 18),
+        todasRecolhidas ? 'Expandir todas' : 'Recolher todas');
+    }
+    btnTodas.addEventListener('click', () => {
+      const recolher = !secoes.every((s) => s.hasAttribute('data-recolhida'));
+      secoes.forEach((s) => definirRecolhida(s, recolher));
+      atualizarBotaoTodas();
+    });
+    if (recolhivel && secoes.length > 1) {
+      atualizarBotaoTodas();
+      conteudo.append(h('div', { class: 'mb-4 flex justify-end' }, btnTodas));
+    }
+    conteudo.append(...secoes);
   }
 
   raiz.replaceChildren(conteudo);

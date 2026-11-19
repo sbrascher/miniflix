@@ -10,6 +10,7 @@ import { esquecerProgresso } from './progresso.js';
 import { secaoCapa } from './capa.js';
 import { campoTags } from './tags.js';
 import { painelPasta } from './pasta.js';
+import { painelCategorias } from './categorias.js';
 
 let filtro = ''; // preservado entre re-renderizações
 
@@ -81,6 +82,8 @@ export function renderAdmin(raiz, estado) {
     painelPasta(estado),
 
     criarPainelFila(),
+
+    painelCategorias(estado),
 
     // Acervo
     h('section', { class: 'mt-12', 'aria-labelledby': 'titulo-acervo' },

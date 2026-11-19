@@ -400,6 +400,61 @@
     background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
     box-shadow: var(--relevo-1), inset 0 1px 0 rgb(255 255 255 / 0.2);
   }
+  .chip-pequeno { padding: 0.1rem 0.55rem; font-size: 0.7rem; font-weight: 500; }
+
+  /* ---------- Tags ---------- */
+  /* Chip que liga/desliga um filtro (catálogo) ou leva ao catálogo filtrado (player). */
+  .chip-filtro {
+    min-height: 2rem;
+    padding: 0.3rem 0.9rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    user-select: none;
+    transition: box-shadow var(--rapido) var(--ease), transform var(--rapido) var(--ease), color var(--rapido);
+  }
+  .chip-filtro:hover { color: var(--destaque); }
+  .chip-filtro:active { box-shadow: var(--afundar-leve); transform: translateY(1px); }
+  .chip-filtro:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+  /* Selecionado: afundado + cor da marca (o ícone de "check" garante que não depende só da cor). */
+  .chip-filtro[aria-pressed=true] {
+    color: #fff;
+    background: linear-gradient(180deg, var(--marca-topo), var(--marca-base));
+    box-shadow: inset 1px 2px 4px rgb(0 0 0 / 0.3);
+  }
+
+  /* Campo de tags do modal Editar: chips + entrada de texto dentro de um único "campo". */
+  .campo-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    cursor: text;
+  }
+  .campo-tags:focus-within { box-shadow: var(--afundar), 0 0 0 2px var(--destaque); }
+  .campo-tags-entrada {
+    flex: 1 1 8rem;
+    min-width: 8rem;
+    min-height: 1.75rem;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+  }
+  .campo-tags-entrada::placeholder { color: var(--suave); opacity: 1; }
+  .chip-tag { padding-right: 0.25rem; font-size: 0.8rem; }
+  .chip-tag-remover {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    color: var(--suave);
+    cursor: pointer;
+  }
+  .chip-tag-remover:hover { color: var(--perigo); background: var(--afundado); }
+  .chip-tag-remover:focus-visible { outline: 2px solid var(--destaque); outline-offset: 1px; }
 
   .selo-duracao {
     position: absolute;
@@ -796,7 +851,8 @@
     border: 1px solid CanvasText;
   }
   .trilho-preenchimento { background: Highlight; }
-  .campo:focus { outline: 2px solid Highlight; }
+  .campo:focus, .campo-tags:focus-within { outline: 2px solid Highlight; }
+  .chip-filtro[aria-pressed=true] { background: Highlight; color: HighlightText; }
 }
 
 /* Quem pede menos movimento no Windows não vê zoom, elevação nem animações. */

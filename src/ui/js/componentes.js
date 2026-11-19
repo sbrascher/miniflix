@@ -49,6 +49,21 @@ export function confirmar({ titulo, mensagem, textoConfirmar = 'Confirmar', peri
   }).then(Boolean);
 }
 
+// ---------- Aviso que sobrevive a um recarregamento da página ----------
+// Usado quando a pasta dos vídeos muda: o WebView2 só passa a servir a pasta nova após recarregar.
+const CHAVE_AVISO = 'miniflix.avisoPendente';
+
+export function recarregarComAviso(mensagem) {
+  try { sessionStorage.setItem(CHAVE_AVISO, mensagem); } catch { /* sem armazenamento: só não mostra o aviso */ }
+  location.reload();
+}
+
+export function mostrarAvisoPendente() {
+  let mensagem = null;
+  try { mensagem = sessionStorage.getItem(CHAVE_AVISO); sessionStorage.removeItem(CHAVE_AVISO); } catch { /* ignora */ }
+  if (mensagem) toast(mensagem);
+}
+
 let pilhaToasts;
 /**
  * Aviso rápido no canto da tela. tipo: 'ok' | 'erro'.

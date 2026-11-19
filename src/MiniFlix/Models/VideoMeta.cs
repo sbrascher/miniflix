@@ -8,6 +8,7 @@ public sealed class VideoMeta
     public string Titulo { get; set; } = "";
     public string Descricao { get; set; } = "";
     public string Categoria { get; set; } = "";
+    public List<string> Tags { get; set; } = [];
     public string Origem { get; set; } = "";          // "youtube" | "local"
     public string? UrlOrigem { get; set; }
     public double DuracaoSegundos { get; set; }

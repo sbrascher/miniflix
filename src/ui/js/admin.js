@@ -1,13 +1,15 @@
 import { bridge } from './bridge.js';
 import { h, normalizar, fmtDuracao, fmtBytes, fmtDataHora, plural } from './util.js';
 import { icone } from './icones.js';
-import { abrirModal, confirmar, toast } from './componentes.js';
+import { abrirModal, confirmar, toast, recarregarComAviso } from './componentes.js';
 import { cardImportar } from './importar.js';
 import { cardYoutube } from './youtube.js';
 import { criarPainelFila } from './fila.js';
 import { imagemCapa } from './catalogo.js';
 import { esquecerProgresso } from './progresso.js';
 import { secaoCapa } from './capa.js';
+import { campoTags } from './tags.js';
+import { painelPasta } from './pasta.js';
 
 let filtro = ''; // preservado entre re-renderizações
 
@@ -17,18 +19,19 @@ export function renderAdmin(raiz, estado) {
   const contador = h('span', { class: 'chip font-medium text-suave' });
 
   const campoFiltro = h('input', {
-    type: 'search', class: 'campo w-full pl-11 sm:w-72', placeholder: 'Filtrar por título ou categoria…',
+    type: 'search', class: 'campo w-full pl-11 sm:w-72', placeholder: 'Filtrar por título, categoria ou tag…',
     value: filtro, 'aria-label': 'Filtrar acervo',
   });
   campoFiltro.addEventListener('input', () => { filtro = campoFiltro.value; renderTabela(); });
 
-  const btnRecarregar = h('button', { type: 'button', class: 'btn', title: 'Ler novamente a pasta /videos' },
+  const btnRecarregar = h('button', { type: 'button', class: 'btn', title: 'Ler novamente a pasta dos vídeos' },
     icone('refresh', 18), 'Recarregar pasta');
   btnRecarregar.addEventListener('click', async () => {
     btnRecarregar.disabled = true;
     try {
-      await bridge.call('catalogo.recarregar');
-      toast('Pasta de vídeos lida novamente.');
+      const r = await bridge.call('catalogo.recarregar');
+      if (r?.recarregarPagina) recarregarComAviso('Pasta de vídeos encontrada e lida novamente.');
+      else toast('Pasta de vídeos lida novamente.');
     } catch (e) {
       toast(e.message, 'erro');
     } finally {
@@ -39,7 +42,7 @@ export function renderAdmin(raiz, estado) {
   function renderTabela() {
     const termos = normalizar(filtro).split(/\s+/).filter(Boolean);
     const lista = estado.videos.filter((v) => {
-      const alvo = normalizar(`${v.titulo} ${v.categoria}`);
+      const alvo = normalizar(`${v.titulo} ${v.categoria} ${(v.tags ?? []).join(' ')}`);
       return termos.every((t) => alvo.includes(t));
     });
     contador.textContent = filtro.trim()
@@ -74,6 +77,8 @@ export function renderAdmin(raiz, estado) {
     h('div', { class: 'mt-7 grid gap-6 md:grid-cols-2' },
       cardImportar(estado),
       cardYoutube(estado)),
+
+    painelPasta(estado),
 
     criarPainelFila(),
 
@@ -110,6 +115,8 @@ function linha(v, estado) {
         h('div', { class: 'min-w-0' },
           h('p', { class: 'line-clamp-2 font-medium leading-snug' }, v.titulo),
           h('p', { class: 'mt-0.5 truncate font-mono text-xs text-suave' }, v.slug),
+          v.tags?.length > 0 && h('p', { class: 'mt-1.5 flex flex-wrap gap-1.5' },
+            h('span', { class: 'sr-only' }, 'Tags: '), v.tags.map((t) => h('span', { class: 'chip chip-pequeno' }, t))),
           h('p', { class: 'mt-0.5 text-xs text-suave sm:hidden' }, v.categoria)))),
     h('td', { class: 'hidden sm:table-cell' }, h('span', { class: 'chip' }, v.categoria)),
     h('td', { class: 'hidden text-sm tabular-nums text-suave md:table-cell' }, fmtDuracao(v.duracaoSegundos) || '—'),
@@ -130,6 +137,7 @@ async function editar(v, estado) {
     value: v.categoria === 'Sem categoria' ? '' : v.categoria, placeholder: 'Sem categoria',
   });
   const descricao = h('textarea', { id: 'ed-descricao', class: 'campo w-full', rows: 4, maxlength: 10000 });
+  const tags = campoTags({ id: 'ed-tags', valores: v.tags ?? [], sugestoes: estado.tags ?? [] });
   const capa = secaoCapa(v);
   descricao.value = v.descricao ?? '';
 
@@ -143,8 +151,9 @@ async function editar(v, estado) {
       categoria,
       h('datalist', { id: 'ed-categorias' }, estado.categorias.filter((c) => c !== 'Sem categoria').map((c) => h('option', { value: c }))),
       h('p', { class: 'mt-1.5 text-xs text-suave' }, 'Escolha uma existente ou digite um nome novo para criar a categoria.')),
+    h('div', {}, h('label', { for: 'ed-tags', class: 'rotulo' }, 'Tags'), tags.el),
     h('div', {}, h('label', { for: 'ed-descricao', class: 'rotulo' }, 'Descrição'), descricao),
-    h('p', { class: 'text-xs text-suave' }, 'Pasta: ', h('code', { class: 'font-mono' }, `videos/${v.slug}`), ' (o nome da pasta não muda).'),
+    h('p', { class: 'text-xs text-suave' }, 'Pasta: ', h('code', { class: 'font-mono' }, v.slug), ' (o nome da pasta não muda).'),
     erro);
 
   const salvo = abrirModal({
@@ -166,7 +175,7 @@ async function editar(v, estado) {
         titulo.removeAttribute('aria-invalid');
         try {
           await bridge.call('video.editar', {
-            slug: v.slug, titulo: titulo.value, categoria: categoria.value, descricao: descricao.value,
+            slug: v.slug, titulo: titulo.value, categoria: categoria.value, descricao: descricao.value, tags: tags.valores(),
           });
           await capa.confirmar();
           fechar(true);

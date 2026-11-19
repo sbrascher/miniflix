@@ -5,7 +5,7 @@ import { renderCatalogo, focarAposRemocao } from './catalogo.js';
 import { renderPlayer } from './player.js';
 import { renderAdmin } from './admin.js';
 import { atualizarFila } from './fila.js';
-import { confirmar, toast } from './componentes.js';
+import { confirmar, toast, recarregarComAviso, mostrarAvisoPendente } from './componentes.js';
 import { carregarProgresso } from './progresso.js';
 
 const $ = (s) => document.querySelector(s);
@@ -16,6 +16,9 @@ const campoCategoria = $('#categoria');
 const estado = {
   videos: [],
   categorias: [],
+  tags: [],              // todas as tags do acervo
+  tagsSelecionadas: [],  // filtro do catálogo (o vídeo precisa ter todas)
+  pasta: null,           // { caminho, padrao, disponivel }
   busca: '',
   categoria: '',
   tema: document.documentElement.dataset.theme || 'escuro',
@@ -45,7 +48,10 @@ async function carregarCatalogo() {
   const r = await bridge.call('catalogo.listar');
   estado.videos = r.videos;
   estado.categorias = r.categorias;
+  estado.tags = r.tags;
+  estado.pasta = r.pasta;
   if (estado.categoria && !estado.categorias.includes(estado.categoria)) estado.categoria = '';
+  estado.tagsSelecionadas = estado.tagsSelecionadas.filter((t) => estado.tags.includes(t));
 
   campoCategoria.replaceChildren(
     h('option', { value: '' }, 'Todas as categorias'),
@@ -61,8 +67,35 @@ function desenharCatalogo() {
       window.scrollTo(0, rolagem);
       if (focarIndice !== undefined) focarAposRemocao(raiz, focarIndice);
     },
+    // tag = null limpa todas. O foco volta ao mesmo chip depois de redesenhar.
+    aoAlternarTag: (tag) => {
+      const sel = estado.tagsSelecionadas;
+      estado.tagsSelecionadas = tag === null ? [] : sel.includes(tag) ? sel.filter((t) => t !== tag) : [...sel, tag];
+      const rolagem = window.scrollY;
+      desenharCatalogo();
+      window.scrollTo(0, rolagem);
+      const alvo = tag === null ? raiz.querySelector('.chip-filtro') : raiz.querySelector(`.chip-filtro[data-tag="${CSS.escape(tag)}"]`);
+      alvo?.focus({ preventScroll: true });
+    },
+    aoRecarregar: async () => {
+      try {
+        const r = await bridge.call('catalogo.recarregar');
+        if (r?.recarregarPagina) recarregarComAviso('Pasta de vídeos encontrada.');
+        else if (!r?.pasta?.disponivel) toast('A pasta ainda não foi encontrada.', 'erro');
+      } catch (e) { toast(e.message, 'erro'); }
+    },
   });
 }
+
+/** Clique numa tag fora do catálogo (ex.: no player): mostra o catálogo filtrado só por ela. */
+document.addEventListener('miniflix:filtrar-tag', (e) => {
+  estado.tagsSelecionadas = [e.detail];
+  estado.busca = ''; campoBusca.value = '';
+  estado.categoria = ''; campoCategoria.value = '';
+  rolagemCatalogo = 0;
+  if (rotaAtual().nome === 'catalogo') atualizarCatalogoNaTela();
+  else location.hash = '#/';
+});
 function atualizarCatalogoNaTela() {
   if (rotaAtual().nome === 'catalogo') desenharCatalogo();
 }
@@ -183,6 +216,7 @@ aplicarTema(estado.tema);
     await Promise.all([carregarCatalogo(), carregarProgresso()]);
     aoMudarFila(await bridge.call('fila.listar'));
     navegar();
+    mostrarAvisoPendente();
   } catch (e) {
     raiz.replaceChildren(h('div', { class: 'mx-auto mt-24 max-w-md text-center' },
       h('div', { class: 'mx-auto mb-4 w-fit text-destaque' }, icone('warning', 40, true)),

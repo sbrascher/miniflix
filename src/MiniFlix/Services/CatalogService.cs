@@ -10,7 +10,8 @@ public sealed class CatalogService
 {
     public const string SemCategoria = "Sem categoria";
 
-    private readonly string _pastaVideos;
+    private volatile string _pastaVideos;
+    private volatile bool _criarSeFaltar;
     private readonly string _arquivoCache;
     private readonly Func<string, string> _paraUrl;
     private readonly object _trava = new();
@@ -19,14 +20,46 @@ public sealed class CatalogService
     /// <summary>Disparado (em thread de fundo) quando uma varredura muda o catálogo.</summary>
     public event Action? Alterado;
 
-    public CatalogService(string pastaVideos, string arquivoCache, Func<string, string> paraUrl)
+    /// <param name="criarSeFaltar">true para a pasta padrão (é criada); false para uma pasta escolhida
+    /// pelo usuário, que pode estar num disco desconectado (aí o catálogo fica vazio e avisa).</param>
+    public CatalogService(string pastaVideos, string arquivoCache, Func<string, string> paraUrl, bool criarSeFaltar = true)
     {
         _pastaVideos = pastaVideos;
+        _criarSeFaltar = criarSeFaltar;
         _arquivoCache = arquivoCache;
         _paraUrl = paraUrl;
     }
 
     public IReadOnlyList<VideoItem> Itens { get { lock (_trava) return _itens; } }
+
+    /// <summary>Pasta onde está o acervo agora.</summary>
+    public string PastaVideos => _pastaVideos;
+
+    /// <summary>false se a pasta configurada não existe (ex.: HD externo desconectado).</summary>
+    public bool PastaDisponivel => Directory.Exists(_pastaVideos);
+
+    /// <summary>Passa a usar outra pasta como acervo (os arquivos não são movidos) e relê o catálogo.</summary>
+    public void TrocarPasta(string novaPasta, bool criarSeFaltar)
+    {
+        lock (_travaPublicacao)
+        {
+            _pastaVideos = novaPasta;
+            _criarSeFaltar = criarSeFaltar;
+        }
+        Log.Info($"Pasta de vídeos: {novaPasta}");
+        try { LimparExclusoesPendentes(); } catch (Exception ex) { Log.Erro("Falha ao limpar a nova pasta de vídeos", ex); }
+        Varrer();
+    }
+
+    /// <summary>Todas as tags em uso, em ordem alfabética (pt-BR, sem diferenciar maiúsculas).</summary>
+    public IReadOnlyList<string> Tags()
+    {
+        var cultura = System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+        return Itens.SelectMany(i => i.Meta.Tags)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(t => t, StringComparer.Create(cultura, ignoreCase: true))
+            .ToList();
+    }
 
     public IReadOnlyList<string> Categorias()
     {
@@ -47,7 +80,8 @@ public sealed class CatalogService
         if (cache is not null)
         {
             // Só aproveita do cache o que ainda existe no disco.
-            var itens = cache.Select(MontarItem).OfType<VideoItem>().ToList();
+            var pastaVideos = _pastaVideos;
+            var itens = cache.Select(m => MontarItem(m, pastaVideos)).OfType<VideoItem>().ToList();
             lock (_trava) _itens = Ordenar(itens);
         }
         Task.Run(() =>
@@ -60,10 +94,13 @@ public sealed class CatalogService
     /// <summary>Lê todas as pastas de /videos, atualiza memória e cache. Retorna true se algo mudou.</summary>
     public bool Varrer()
     {
-        Directory.CreateDirectory(_pastaVideos);
+        var pastaVideos = _pastaVideos;
+        if (_criarSeFaltar) Directory.CreateDirectory(pastaVideos);
         var novos = new List<VideoItem>();
 
-        foreach (var pasta in Directory.EnumerateDirectories(_pastaVideos))
+        if (!Directory.Exists(pastaVideos))
+            Log.Aviso($"Pasta de vídeos não encontrada: {pastaVideos}");
+        else foreach (var pasta in Directory.EnumerateDirectories(pastaVideos))
         {
             var slug = Path.GetFileName(pasta);
             if (!Slug.EhValido(slug))
@@ -84,7 +121,7 @@ public sealed class CatalogService
                 meta.Slug = slug;
             }
 
-            var item = MontarItem(meta);
+            var item = MontarItem(meta, pastaVideos);
             if (item is null) Log.Aviso($"Vídeo sem .mp4 ignorado: {slug}");
             else novos.Add(item);
         }
@@ -109,11 +146,31 @@ public sealed class CatalogService
 
     // ---------- Edição e exclusão ----------
 
-    public const int MaxTitulo = 200, MaxCategoria = 60, MaxDescricao = 10_000;
+    public const int MaxTitulo = 200, MaxCategoria = 60, MaxDescricao = 10_000, MaxTag = 30, MaxTags = 20;
     private const string PrefixoExclusao = "_excluindo-";
 
-    /// <summary>Altera título, categoria e descrição. O slug (nome da pasta) nunca muda.</summary>
-    public VideoItem Editar(string slug, string? titulo, string? categoria, string? descricao)
+    /// <summary>
+    /// Limpa e valida as tags: tira espaços extras, ignora vazias e repetidas (sem diferenciar
+    /// maiúsculas) e reaproveita a grafia de uma tag já existente no acervo ("Python" -> "python").
+    /// </summary>
+    public List<string> NormalizarTags(IEnumerable<string?> tags)
+    {
+        var existentes = Tags();
+        var resultado = new List<string>();
+        foreach (var bruta in tags)
+        {
+            var tag = string.Join(' ', (bruta ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (tag.Length == 0) continue;
+            if (tag.Length > MaxTag) throw new ArgumentException($"Cada tag pode ter no máximo {MaxTag} caracteres (“{tag}”).");
+            tag = existentes.FirstOrDefault(e => e.Equals(tag, StringComparison.OrdinalIgnoreCase)) ?? tag;
+            if (!resultado.Contains(tag, StringComparer.OrdinalIgnoreCase)) resultado.Add(tag);
+        }
+        if (resultado.Count > MaxTags) throw new ArgumentException($"Um vídeo pode ter no máximo {MaxTags} tags.");
+        return resultado;
+    }
+
+    /// <summary>Altera título, categoria, descrição e tags (null = manter). O slug (nome da pasta) nunca muda.</summary>
+    public VideoItem Editar(string slug, string? titulo, string? categoria, string? descricao, IEnumerable<string?>? tags = null)
     {
         var pasta = PastaDoVideo(slug);
         var arquivo = Path.Combine(pasta, slug + ".json");
@@ -136,6 +193,7 @@ public sealed class CatalogService
         meta.Titulo = titulo;
         meta.Categoria = categoria;
         meta.Descricao = descricao;
+        if (tags is not null) meta.Tags = NormalizarTags(tags);
         JsonStore.Gravar(arquivo, meta);
         Log.Info($"Vídeo editado: {slug}");
 
@@ -173,8 +231,12 @@ public sealed class CatalogService
         foreach (var prefixo in new[] { PrefixoExclusao, PrefixoTemporario })
             foreach (var d in Directory.EnumerateDirectories(_pastaVideos, prefixo + "*"))
                 ApagarPastaTemporaria(d);
-        foreach (var previa in Directory.EnumerateFiles(_pastaVideos, "*" + SufixoPrevia, SearchOption.AllDirectories))
-            try { File.Delete(previa); } catch (IOException) { }
+        // Só um nível (<slug>/<slug>.previa.jpg): a pasta pode ser escolhida pelo usuário e ter outras coisas.
+        foreach (var dir in Directory.EnumerateDirectories(_pastaVideos))
+        {
+            var previa = Path.Combine(dir, Path.GetFileName(dir) + SufixoPrevia);
+            try { if (File.Exists(previa)) File.Delete(previa); } catch (IOException) { }
+        }
     }
 
     // ---------- Troca de capa ----------
@@ -278,16 +340,18 @@ public sealed class CatalogService
         return pasta;
     }
 
-    private VideoItem? MontarItem(VideoMeta meta)
+    private VideoItem? MontarItem(VideoMeta meta, string pastaVideos)
     {
         if (!Slug.EhValido(meta.Slug)) return null;
-        var pasta = Path.Combine(_pastaVideos, meta.Slug);
+        var pasta = Path.Combine(pastaVideos, meta.Slug);
         var mp4 = new FileInfo(Path.Combine(pasta, meta.Slug + ".mp4"));
         if (!mp4.Exists) return null;
 
         if (string.IsNullOrWhiteSpace(meta.Titulo)) meta.Titulo = meta.Slug;
         if (string.IsNullOrWhiteSpace(meta.Categoria)) meta.Categoria = SemCategoria;
         meta.Categoria = meta.Categoria.Trim();
+        meta.Tags = (meta.Tags ?? []).Select(t => t?.Trim() ?? "").Where(t => t.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         var capa = new FileInfo(Path.Combine(pasta, meta.Slug + ".jpg"));
         return new VideoItem(meta, _paraUrl(mp4.FullName), capa.Exists ? UrlVersionada(capa) : null, mp4.Length);
@@ -307,6 +371,7 @@ public sealed class CatalogService
             var (x, y) = (a[i], b[i]);
             if (x.Meta.Slug != y.Meta.Slug || x.Meta.Titulo != y.Meta.Titulo || x.Meta.Categoria != y.Meta.Categoria ||
                 x.Meta.Descricao != y.Meta.Descricao || x.Meta.DuracaoSegundos != y.Meta.DuracaoSegundos ||
+                !x.Meta.Tags.SequenceEqual(y.Meta.Tags) || x.VideoUrl != y.VideoUrl ||
                 x.CapaUrl != y.CapaUrl || x.TamanhoBytes != y.TamanhoBytes)
                 return false;
         }

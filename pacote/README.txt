@@ -64,6 +64,13 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   Clique em qualquer capa. Use a busca (tecla / ) e o filtro de
   categoria no topo para encontrar vídeos.
 
+  FILTRAR POR TAG
+    Se os vídeos tiverem tags, elas aparecem no alto do catálogo.
+    Clique numa tag para ver só os vídeos com ela; clique em outras
+    para combinar (aparecem os vídeos que têm TODAS as marcadas).
+    "Limpar tags" desfaz o filtro. No player, clicar numa tag do
+    vídeo também mostra o catálogo filtrado por ela.
+
   CONTINUAR ASSISTINDO
     O MiniFlix lembra onde você parou em cada vídeo. Os vídeos
     começados aparecem na fileira "Continuar assistindo" e voltam
@@ -93,8 +100,26 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
 --------------------------------------------------------------------------
 
   Na Administração, a tabela "Acervo" lista todos os vídeos. Ali você
-  pode assistir, editar (título, categoria e descrição) ou excluir.
-  A exclusão apaga o vídeo do disco e não pode ser desfeita.
+  pode assistir, editar (título, categoria, tags e descrição) ou
+  excluir. A exclusão apaga o vídeo do disco e não pode ser desfeita.
+
+  TAGS
+    Em Editar, no campo "Tags", digite uma palavra e tecle Enter (ou
+    vírgula). Um vídeo pode ter várias tags (até 20), por exemplo
+    "iniciante" e "aula ao vivo". Para tirar uma tag, clique no X dela.
+
+  PASTA DOS VÍDEOS
+    Por padrão os vídeos ficam na pasta "videos", ao lado do
+    MiniFlix.exe. Em Administração > "Pasta dos vídeos" você pode
+    escolher outra pasta: em outro disco, num HD externo etc.
+      * Trocar a pasta não move nem apaga nada. Para levar os vídeos
+        junto, copie as pastas deles para a pasta nova.
+      * Só aparecem vídeos organizados pelo MiniFlix (uma pasta por
+        vídeo). Arquivos de vídeo soltos devem ser trazidos por
+        "Importar do computador".
+      * Se a pasta escolhida ficar num disco desconectado, o catálogo
+        avisa; conecte o disco e clique em "Tentar novamente".
+      * "Voltar para a pasta padrão" volta a usar a pasta "videos".
 
   TROCAR A CAPA
     A capa é criada automaticamente (um quadro do vídeo, ou a miniatura
@@ -135,7 +160,8 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   ui\ ............ a interface do programa
 
   Criadas na primeira vez que o MiniFlix é aberto:
-  videos\ ........ seus vídeos (uma pasta por vídeo)
+  videos\ ........ seus vídeos (uma pasta por vídeo), a menos que você
+                   escolha outra pasta na Administração
   data\ .......... configurações, posição de cada vídeo e registros
 
 

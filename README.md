@@ -21,7 +21,9 @@
 - ⏯️ **Continuar assistindo:** o MiniFlix lembra onde você parou em cada vídeo.
 - ⬇️ **Adicionar do YouTube** colando a URL. A fila baixa um vídeo por vez e mostra o progresso em tempo real.
 - 📁 **Importar vídeos do computador**, convertendo para MP4 só quando necessário.
-- 🗂️ **Gerenciar o acervo:** editar título, categoria e descrição, ou excluir vídeos.
+- 🗂️ **Gerenciar o acervo:** editar título, categoria, tags e descrição, ou excluir vídeos.
+- 🏷️ **Tags:** cada vídeo pode ter várias tags; o catálogo filtra por uma ou mais delas (o vídeo precisa ter todas).
+- 📁 **Pasta dos vídeos configurável:** o acervo pode ficar em qualquer pasta (outro disco, HD externo); a escolha é salva em `data\settings.json`.
 - 🌗 **Modo claro e modo escuro.**
 - 🔌 **100% offline e portátil:** nenhuma CDN, nada no Registro, nada em `AppData`.
 
@@ -30,8 +32,8 @@
 ```
 MiniFlix.exe  (C# / .NET 10, WinForms)
    └── WebView2 ── interface HTML + CSS + JavaScript puro
-         │           servida em https://app.miniflix.example/
-         │           (host virtual mapeado para a pasta do app)
+         │           servida em https://app.miniflix.example/ (pasta do app)
+         │           vídeos em https://videos.miniflix.example/ (pasta dos vídeos)
          └── ponte JS ↔ C#  ──►  yt-dlp · ffmpeg · arquivos JSON
 ```
 
@@ -48,7 +50,7 @@ MiniFlix\
   ├── bin\       yt-dlp, ffmpeg, deno, webview2
   ├── ui\        interface (HTML/CSS/JS)
   ├── data\      configurações, progresso, cache
-  └── videos\
+  └── videos\    acervo (padrão; pode apontar para outra pasta)
         └── aula-01-introducao\
               ├── aula-01-introducao.mp4
               ├── aula-01-introducao.jpg

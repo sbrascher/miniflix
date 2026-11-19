@@ -39,10 +39,13 @@ internal sealed class MainForm : Form
         BackColor = _config.Atual.Tema == "claro" ? Color.FromArgb(250, 250, 250) : Color.FromArgb(12, 12, 14);
 
         _bridge = new Bridge(json => RunOnUi(() => _webView.CoreWebView2?.PostWebMessageAsJson(json)));
-        _catalogo = new CatalogService(AppPaths.Videos, Path.Combine(AppPaths.Data, "catalog-cache.json"), AppPaths.ToUrl);
+        var pastaVideos = PastaVideos.Resolver(_config.Atual.PastaVideos, AppPaths.Root, AppPaths.VideosPadrao);
+        _catalogo = new CatalogService(pastaVideos, Path.Combine(AppPaths.Data, "catalog-cache.json"),
+            p => AppPaths.ToVideoUrl(_catalogo!.PastaVideos, p),
+            criarSeFaltar: PastaVideos.MesmoCaminho(pastaVideos, AppPaths.VideosPadrao));
         _catalogo.Alterado += () => _bridge.Emitir("catalogo.atualizado");
         Ferramentas.PastaBin = AppPaths.Bin;
-        _importacao = new ImportacaoLocal(_catalogo, AppPaths.Videos);
+        _importacao = new ImportacaoLocal(_catalogo);
         _youtube = new DownloadYoutube(_catalogo);
         _fila.Alterada += itens => _bridge.Emitir("fila.atualizada", itens);
         RegistrarComandos();
@@ -82,8 +85,9 @@ internal sealed class MainForm : Form
         _bridge.Registrar("config.obter", _ => _config.Atual);
         _bridge.Registrar("config.salvar", d =>
         {
-            var novo = d.Deserialize<Settings>(JsonStore.Opcoes) ?? throw new ArgumentException("Configuração vazia.");
-            var salvo = _config.Salvar(novo);
+            // Só o tema vem da UI; a pasta de vídeos tem comandos próprios (com validação e diálogo nativo).
+            var tema = Bridge.Texto(d, "tema");
+            var salvo = _config.Alterar(c => c.Tema = tema);
             RunOnUi(() => BackColor = salvo.Tema == "claro" ? Color.FromArgb(250, 250, 250) : Color.FromArgb(12, 12, 14));
             return salvo;
         });
@@ -92,17 +96,48 @@ internal sealed class MainForm : Form
         {
             videos = _catalogo.Itens.Select(ParaUi),
             categorias = _catalogo.Categorias(),
+            tags = _catalogo.Tags(),
+            pasta = InfoPasta(),
         });
         _bridge.Registrar("catalogo.recarregar", async _ =>
         {
             await Task.Run(_catalogo.Varrer);
+            var recarregarPagina = MapearPastaVideos(); // o disco pode ter sido reconectado
+            _bridge.Emitir("catalogo.atualizado");
+            return (object?)new { recarregarPagina, pasta = InfoPasta() };
+        });
+
+        // ---- Pasta dos vídeos ----
+        _bridge.Registrar("pasta.escolher", async _ =>
+        {
+            string? escolhida = Environment.GetEnvironmentVariable("MINIFLIX_TESTE_PASTA"); // gancho de teste
+            if (string.IsNullOrEmpty(escolhida))
+            {
+                using var dlg = new FolderBrowserDialog
+                {
+                    Description = "Escolha a pasta onde o MiniFlix vai guardar e ler os vídeos",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = true,
+                    InitialDirectory = _catalogo.PastaDisponivel ? _catalogo.PastaVideos : AppPaths.Root,
+                };
+                if (dlg.ShowDialog(this) != DialogResult.OK) return null;
+                escolhida = dlg.SelectedPath;
+            }
+            return (object?)await TrocarPastaAsync(escolhida);
+        });
+        _bridge.Registrar("pasta.usarPadrao", async _ => (object?)await TrocarPastaAsync(AppPaths.VideosPadrao));
+        _bridge.Registrar("pasta.abrir", _ =>
+        {
+            if (!_catalogo.PastaDisponivel) throw new InvalidOperationException("A pasta de vídeos não está disponível.");
+            Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { _catalogo.PastaVideos } });
             return (object?)null;
         });
         _bridge.Registrar("video.editar", async d =>
         {
             var slug = Bridge.Texto(d, "slug");
             string? Campo(string n) => d?[n]?.GetValue<string>();
-            var item = await Task.Run(() => _catalogo.Editar(slug, Campo("titulo"), Campo("categoria"), Campo("descricao")));
+            var tags = (d?["tags"] as JsonArray)?.Select(t => t?.GetValue<string>()).ToList();
+            var item = await Task.Run(() => _catalogo.Editar(slug, Campo("titulo"), Campo("categoria"), Campo("descricao"), tags));
             return ParaUi(item);
         });
         _bridge.Registrar("video.excluir", async d =>
@@ -214,6 +249,7 @@ internal sealed class MainForm : Form
 
         _bridge.Registrar("fila.adicionarLocal", d =>
         {
+            ExigirPastaDisponivel();
             Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
             Ferramentas.Exigir(Ferramentas.Ffprobe, "ffprobe");
             var categoria = d?["categoria"]?.GetValue<string>() ?? "";
@@ -234,6 +270,7 @@ internal sealed class MainForm : Form
 
         _bridge.Registrar("fila.adicionarYoutube", d =>
         {
+            ExigirPastaDisponivel();
             Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
             Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
             var categoria = d?["categoria"]?.GetValue<string>() ?? "";
@@ -282,6 +319,58 @@ internal sealed class MainForm : Form
         });
     }
 
+    // ---------- Pasta dos vídeos ----------
+
+    private object InfoPasta() => new
+    {
+        caminho = _catalogo.PastaVideos,
+        padrao = PastaVideos.MesmoCaminho(_catalogo.PastaVideos, AppPaths.VideosPadrao),
+        disponivel = _catalogo.PastaDisponivel,
+    };
+
+    private void ExigirPastaDisponivel()
+    {
+        if (!_catalogo.PastaDisponivel)
+            throw new InvalidOperationException(
+                $"A pasta de vídeos não foi encontrada ({_catalogo.PastaVideos}). Conecte o disco ou escolha outra pasta na administração.");
+    }
+
+    /// <summary>Valida a pasta, grava na configuração, aponta o host virtual para ela e relê o catálogo.</summary>
+    private async Task<object> TrocarPastaAsync(string pasta)
+    {
+        if (_fila.Ocupada)
+            throw new InvalidOperationException("Aguarde a fila de importação/download terminar para trocar a pasta dos vídeos.");
+        pasta = Path.TrimEndingDirectorySeparator(Path.GetFullPath(pasta));
+        if (PastaVideos.Validar(pasta, AppPaths.Root, AppPaths.VideosPadrao) is { } erro)
+            throw new ArgumentException(erro);
+
+        var padrao = PastaVideos.MesmoCaminho(pasta, AppPaths.VideosPadrao);
+        _config.Alterar(c => c.PastaVideos = PastaVideos.ParaConfig(pasta, AppPaths.Root, AppPaths.VideosPadrao));
+        await Task.Run(() => _catalogo.TrocarPasta(pasta, criarSeFaltar: padrao));
+        var recarregarPagina = MapearPastaVideos();
+        _bridge.Emitir("catalogo.atualizado"); // mesmo que a varredura não mude nada (duas pastas vazias)
+        return new { pasta = InfoPasta(), videos = _catalogo.Itens.Count, recarregarPagina };
+    }
+
+    private string? _pastaMapeada;
+
+    /// <summary>
+    /// Aponta o host virtual dos vídeos para a pasta atual (se ela existir). Chamar na thread da UI.
+    /// Retorna true se o mapeamento mudou: o WebView2 só aplica a mudança na próxima navegação,
+    /// então a página precisa ser recarregada para os vídeos da pasta nova abrirem.
+    /// </summary>
+    private bool MapearPastaVideos()
+    {
+        var core = _webView.CoreWebView2;
+        if (core is null || !_catalogo.PastaDisponivel) return false; // pasta sumiu: mantém o mapeamento antigo (inofensivo)
+        if (_pastaMapeada is not null && PastaVideos.MesmoCaminho(_pastaMapeada, _catalogo.PastaVideos)) return false;
+        if (_pastaMapeada is not null) core.ClearVirtualHostNameToFolderMapping(AppPaths.HostVideos);
+        // Allow (e não DenyCors): a página do app é outra origem e o diagnóstico lê trechos via fetch.
+        core.SetVirtualHostNameToFolderMapping(AppPaths.HostVideos, _catalogo.PastaVideos, CoreWebView2HostResourceAccessKind.Allow);
+        _pastaMapeada = _catalogo.PastaVideos;
+        return true;
+    }
+
     private static string ChaveProgresso(VideoItem i) => ProgressService.Chave(i.Meta.Id, i.Meta.Slug);
 
     private static object ParaUi(VideoItem i) => new
@@ -290,6 +379,7 @@ internal sealed class MainForm : Form
         i.Meta.Titulo,
         i.Meta.Descricao,
         i.Meta.Categoria,
+        i.Meta.Tags,
         i.Meta.Origem,
         i.Meta.UrlOrigem,
         i.Meta.DuracaoSegundos,
@@ -332,7 +422,7 @@ internal sealed class MainForm : Form
             Close();
             return;
         }
-        Log.Info($"Iniciando. WebView2 {_runtimeVersion} ({_runtimeSource}). Raiz: {AppPaths.Root}");
+        Log.Info($"Iniciando. WebView2 {_runtimeVersion} ({_runtimeSource}). Raiz: {AppPaths.Root}. Vídeos: {_catalogo.PastaVideos}");
 
         // 2) Dados do WebView2 dentro da pasta do app (/data/webview), não em %LocalAppData%.
         // App local de mídia: permite autoplay com som ao abrir um vídeo.
@@ -346,8 +436,10 @@ internal sealed class MainForm : Form
         await core.AddScriptToExecuteOnDocumentCreatedAsync(
             $"window.__miniflix = {JsonSerializer.Serialize(new { tema = _config.Atual.Tema })};");
 
-        // 3) Host virtual único -> raiz do app (UI e vídeos na mesma origem, sem CORS).
+        // 3) Hosts virtuais: um para o app (UI) e outro para a pasta dos vídeos, que pode estar em
+        //    qualquer lugar (outra unidade, HD externo). Se ela não existir agora, fica sem mapeamento.
         core.SetVirtualHostNameToFolderMapping(AppPaths.HostName, AppPaths.Root, CoreWebView2HostResourceAccessKind.DenyCors);
+        MapearPastaVideos();
 
 #if !DEBUG
         core.Settings.AreDevToolsEnabled = false;
@@ -498,6 +590,7 @@ internal sealed class MainForm : Form
             webview2Versao = _runtimeVersion,
             webview2Origem = _runtimeSource,
             raiz = AppPaths.Root,
+            pastaVideos = _catalogo.PastaVideos,
             pastaDadosWebView = AppPaths.WebViewData,
             unidade = drive.Name,
             unidadeTipo = drive.DriveType.ToString(),
@@ -506,23 +599,23 @@ internal sealed class MainForm : Form
         };
     }
 
-    private static object ListarVideosTeste() =>
-        Directory.EnumerateFiles(AppPaths.Videos, "*.mp4", SearchOption.AllDirectories)
-            .Select(p => new FileInfo(p))
+    private object ListarVideosTeste() =>
+        _catalogo.Itens
+            .Select(i => new FileInfo(_catalogo.CaminhoVideo(i.Meta.Slug)))
             .OrderByDescending(f => f.Length)
             .Select(f => new
             {
-                nome = Path.GetRelativePath(AppPaths.Videos, f.FullName),
-                caminho = Path.GetRelativePath(AppPaths.Root, f.FullName).Replace('\\', '/'),
-                url = AppPaths.ToUrl(f.FullName),
+                nome = Path.GetRelativePath(_catalogo.PastaVideos, f.FullName),
+                caminho = Path.GetRelativePath(_catalogo.PastaVideos, f.FullName).Replace('\\', '/'),
+                url = AppPaths.ToVideoUrl(_catalogo.PastaVideos, f.FullName),
                 tamanhoBytes = f.Length
             })
             .ToList();
 
     /// <summary>Verifica se o arquivo pode ser aberto com acesso exclusivo (ou seja, se poderia ser excluído).</summary>
-    private static async Task<object?> ArquivoTravadoAsync(string caminho)
+    private async Task<object?> ArquivoTravadoAsync(string caminho)
     {
-        var full = AppPaths.ResolveInside(AppPaths.Videos, caminho)
+        var full = AppPaths.ResolveInside(_catalogo.PastaVideos, caminho)
                    ?? throw new InvalidOperationException("Caminho inválido.");
         if (!File.Exists(full)) throw new FileNotFoundException("Arquivo não encontrado.");
 

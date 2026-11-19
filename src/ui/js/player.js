@@ -94,6 +94,12 @@ export function renderPlayer(raiz, v) {
       h('div', { class: 'moldura-player mt-5' }, tela),
       h('h1', { class: 'mt-7 font-display text-2xl font-bold leading-tight sm:text-3xl' }, v.titulo),
       h('div', { class: 'mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-suave' }, meta),
+      v.tags?.length > 0 && h('ul', { class: 'mt-4 flex flex-wrap gap-2', 'aria-label': 'Tags' },
+        v.tags.map((t) => h('li', {},
+          h('button', {
+            type: 'button', class: 'chip chip-filtro', title: `Ver vídeos com a tag “${t}”`,
+            onclick: () => document.dispatchEvent(new CustomEvent('miniflix:filtrar-tag', { detail: t })),
+          }, icone('sell', 14), t)))),
       v.descricao && h('div', { class: 'painel mt-6 max-w-3xl px-6 py-5' },
         h('h2', { class: 'mb-2 text-sm font-semibold text-suave' }, 'Descrição'),
         h('p', { class: 'whitespace-pre-line leading-relaxed' }, v.descricao)),

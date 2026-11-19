@@ -56,7 +56,7 @@ public sealed class ImportacaoLocalTests : IDisposable
     {
         var cat = new CatalogService(Videos, Path.Combine(_raiz, "cache.json"), p => p);
         var fila = new FilaService();
-        fila.Adicionar(new ImportacaoLocal(cat, Videos).CriarItem(arquivo, titulo, categoria));
+        fila.Adicionar(new ImportacaoLocal(cat).CriarItem(arquivo, titulo, categoria));
         var fim = DateTime.Now.AddSeconds(60);
         while (fila.Ocupada && DateTime.Now < fim) await Task.Delay(50);
         return (fila, cat);
@@ -147,7 +147,7 @@ public sealed class ImportacaoLocalTests : IDisposable
         if (!TemFfmpeg) return;
         var mp4 = await GerarVideo("dup.mp4", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
         var cat = new CatalogService(Videos, Path.Combine(_raiz, "cache.json"), p => p);
-        var imp = new ImportacaoLocal(cat, Videos);
+        var imp = new ImportacaoLocal(cat);
         var fila = new FilaService();
         fila.Adicionar(imp.CriarItem(mp4, "Primeiro", ""));
         fila.Adicionar(imp.CriarItem(mp4, "Segundo", ""));
@@ -234,7 +234,7 @@ public sealed class ImportacaoLocalTests : IDisposable
 
         var cat = new CatalogService(Videos, Path.Combine(_raiz, "cache.json"), p => p);
         var fila = new FilaService();
-        var item = fila.Adicionar(new ImportacaoLocal(cat, Videos).CriarItem(destino, "Longo", ""));
+        var item = fila.Adicionar(new ImportacaoLocal(cat).CriarItem(destino, "Longo", ""));
         var fim = DateTime.Now.AddSeconds(30);
         while (!fila.Itens[0].Etapa.StartsWith("Convertendo") && DateTime.Now < fim) await Task.Delay(20);
         await Task.Delay(300);

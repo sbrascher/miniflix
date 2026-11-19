@@ -5,7 +5,7 @@ using MiniFlix.Models;
 namespace MiniFlix.Services;
 
 /// <summary>Importa um arquivo de vídeo do computador para o acervo (etapa 4).</summary>
-public sealed partial class ImportacaoLocal(CatalogService catalogo, string pastaVideos)
+public sealed partial class ImportacaoLocal(CatalogService catalogo)
 {
     public static readonly string[] Extensoes =
         [".mp4", ".m4v", ".mov", ".mkv", ".webm", ".avi", ".wmv", ".flv", ".mpg", ".mpeg", ".ts", ".3gp"];
@@ -94,7 +94,7 @@ public sealed partial class ImportacaoLocal(CatalogService catalogo, string past
 
     private void VerificarEspaco(long tamanhoOrigem, bool converter)
     {
-        var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(pastaVideos))!);
+        var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(catalogo.PastaVideos))!);
         // Conversão costuma gerar arquivo menor ou parecido; 1,2x dá margem. Remux ≈ tamanho original.
         var necessario = (long)(tamanhoOrigem * (converter ? 1.2 : 1.02)) + 50 * 1024 * 1024;
         if (drive.AvailableFreeSpace < necessario)

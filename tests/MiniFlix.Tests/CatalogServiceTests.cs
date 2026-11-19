@@ -326,4 +326,96 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Equal("escuro", JsonStore.Ler<Settings>(arq)!.Tema);
         Assert.Contains("\"tema\"", File.ReadAllText(arq)); // camelCase, como no plano
     }
+
+    // ---------- Tags ----------
+
+    [Fact]
+    public void Editar_grava_tags_limpas_e_sem_repeticao()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        var item = cat.Editar("v", "T", "", "", ["  Python ", "python", "", "aula   ao vivo", null]);
+        Assert.Equal(["Python", "aula ao vivo"], item.Meta.Tags);
+        Assert.Equal(["Python", "aula ao vivo"], JsonStore.Ler<VideoMeta>(Path.Combine(Videos, "v", "v.json"))!.Tags);
+    }
+
+    [Fact]
+    public void Editar_sem_tags_mantem_as_existentes_e_reaproveita_grafia()
+    {
+        CriarVideo("a");
+        CriarVideo("b");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("a", "A", "", "", ["Python", "Básico"]);
+        Assert.Equal(["Python", "Básico"], cat.Editar("a", "A2", "", "").Meta.Tags); // null = manter
+
+        Assert.Equal(["Python"], cat.Editar("b", "B", "", "", ["PYTHON"]).Meta.Tags);
+        Assert.Equal(["Básico", "Python"], cat.Tags());
+    }
+
+    [Fact]
+    public void Tags_invalidas_sao_rejeitadas()
+    {
+        CriarVideo("v");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Throws<ArgumentException>(() => cat.Editar("v", "T", "", "", [new string('x', CatalogService.MaxTag + 1)]));
+        Assert.Throws<ArgumentException>(() =>
+            cat.Editar("v", "T", "", "", Enumerable.Range(1, CatalogService.MaxTags + 1).Select(i => $"t{i}")));
+    }
+
+    [Fact]
+    public void Json_antigo_sem_tags_vira_lista_vazia()
+    {
+        var dir = Path.Combine(Videos, "velho");
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(Path.Combine(dir, "velho.mp4"), [1]);
+        File.WriteAllText(Path.Combine(dir, "velho.json"), """{ "slug": "velho", "titulo": "Velho", "tags": null }""");
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Empty(Assert.Single(cat.Itens).Meta.Tags);
+    }
+
+    // ---------- Pasta configurável ----------
+
+    [Fact]
+    public void TrocarPasta_le_o_acervo_da_nova_pasta()
+    {
+        CriarVideo("aqui");
+        var outra = Path.Combine(_raiz, "outra");
+        Directory.CreateDirectory(Path.Combine(outra, "la"));
+        File.WriteAllBytes(Path.Combine(outra, "la", "la.mp4"), [1]);
+        JsonStore.Gravar(Path.Combine(outra, "la", "la.json"), new VideoMeta { Slug = "la", Titulo = "Lá" });
+
+        var cat = Novo();
+        cat.Varrer();
+        Assert.Equal("aqui", Assert.Single(cat.Itens).Meta.Slug);
+
+        cat.TrocarPasta(outra, criarSeFaltar: false);
+        Assert.Equal("la", Assert.Single(cat.Itens).Meta.Slug);
+        Assert.Equal(outra, cat.PastaVideos);
+    }
+
+    [Fact]
+    public void Pasta_escolhida_ausente_nao_e_criada_e_catalogo_fica_vazio()
+    {
+        CriarVideo("v");
+        var ausente = Path.Combine(_raiz, "hd-desconectado", "Filmes");
+        var cat = new CatalogService(ausente, Cache, p => p, criarSeFaltar: false);
+        cat.Varrer();
+        Assert.Empty(cat.Itens);
+        Assert.False(cat.PastaDisponivel);
+        Assert.False(Directory.Exists(ausente));
+    }
+
+    [Fact]
+    public void Limpeza_nao_apaga_arquivos_previa_fora_das_pastas_de_video()
+    {
+        var alheio = Path.Combine(Videos, "Minhas Fotos", "sub", "foto.previa.jpg");
+        Directory.CreateDirectory(Path.GetDirectoryName(alheio)!);
+        File.WriteAllBytes(alheio, [1]);
+        Novo().LimparExclusoesPendentes();
+        Assert.True(File.Exists(alheio));
+    }
 }

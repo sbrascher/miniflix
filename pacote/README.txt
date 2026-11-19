@@ -62,7 +62,9 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
 --------------------------------------------------------------------------
 
   Clique em qualquer capa. Use a busca (tecla / ) e o filtro de
-  categoria no topo para encontrar vídeos.
+  categoria no topo para encontrar vídeos. A busca procura no título,
+  na descrição, nas tags e na categoria; os vídeos cujo título tem as
+  palavras aparecem primeiro.
 
   RECOLHER CATEGORIAS
     Clique no nome de uma categoria para recolher (ou abrir de novo)
@@ -119,6 +121,12 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     Em Editar, no campo "Tags", digite uma palavra e tecle Enter (ou
     vírgula). Um vídeo pode ter várias tags (até 20), por exemplo
     "iniciante" e "aula ao vivo". Para tirar uma tag, clique no X dela.
+
+  TAGS EM VÁRIOS VÍDEOS DE UMA VEZ
+    Na tabela "Acervo", marque as caixinhas à esquerda dos vídeos
+    (Shift + clique marca um intervalo; a caixinha do cabeçalho marca
+    todos os da lista). Na barra que aparece, use "Adicionar tags..."
+    ou "Remover tags...". As outras tags de cada vídeo continuam.
 
   PASTA DOS VÍDEOS
     Por padrão os vídeos ficam na pasta "videos", ao lado do

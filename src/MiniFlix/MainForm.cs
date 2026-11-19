@@ -140,6 +140,14 @@ internal sealed class MainForm : Form
             var item = await Task.Run(() => _catalogo.Editar(slug, Campo("titulo"), Campo("categoria"), Campo("descricao"), tags));
             return ParaUi(item);
         });
+        _bridge.Registrar("videos.alterarTags", async d =>
+        {
+            static List<string?> Lista(JsonObject? d, string campo) =>
+                (d?[campo] as JsonArray)?.Select(n => n?.GetValue<string>()).ToList() ?? [];
+            var slugs = Lista(d, "slugs").OfType<string>().ToList();
+            var alterados = await Task.Run(() => _catalogo.AlterarTagsEmMassa(slugs, Lista(d, "adicionar"), Lista(d, "remover")));
+            return (object?)new { alterados };
+        });
         _bridge.Registrar("categoria.renomear", async d =>
         {
             var antiga = Bridge.Texto(d, "antiga");

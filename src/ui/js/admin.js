@@ -11,12 +11,14 @@ import { secaoCapa } from './capa.js';
 import { campoTags } from './tags.js';
 import { painelPasta } from './pasta.js';
 import { painelCategorias } from './categorias.js';
+import { criarSelecao } from './selecao.js';
 
 let filtro = ''; // preservado entre re-renderizações
 
 /** Tela 3 — Área administrativa. */
 export function renderAdmin(raiz, estado) {
   const corpoTabela = h('div');
+  const selecao = criarSelecao(estado);
   const contador = h('span', { class: 'chip font-medium text-suave' });
 
   const campoFiltro = h('input', {
@@ -57,6 +59,8 @@ export function renderAdmin(raiz, estado) {
     }
     if (lista.length === 0) {
       corpoTabela.replaceChildren(h('p', { class: 'px-6 py-14 text-center text-suave' }, 'Nenhum vídeo corresponde ao filtro.'));
+      selecao.caixaCabecalho([]);
+      selecao.atualizar();
       return;
     }
 
@@ -64,10 +68,12 @@ export function renderAdmin(raiz, estado) {
     corpoTabela.replaceChildren(h('table', { class: 'tabela' },
       h('thead', {},
         h('tr', {},
+          h('th', { scope: 'col', class: 'w-12 !pr-0' }, selecao.caixaCabecalho(lista)),
           th('Vídeo'), th('Categoria', 'hidden sm:table-cell'), th('Duração', 'hidden md:table-cell'),
           th('Tamanho', 'hidden lg:table-cell'), th('Adicionado', 'hidden lg:table-cell'),
           th('Ações', 'text-right'))),
-      h('tbody', {}, lista.map((v) => linha(v, estado)))));
+      h('tbody', {}, lista.map((v) => linha(v, estado, selecao.caixaLinha(v))))));
+    selecao.atualizar();
   }
 
   raiz.replaceChildren(h('div', { class: 'mx-auto max-w-[1400px] px-4 pb-16 pt-6 sm:px-6' },
@@ -94,6 +100,7 @@ export function renderAdmin(raiz, estado) {
             h('span', { class: 'pointer-events-none absolute left-3.5 top-1/2 flex -translate-y-1/2 text-suave' }, icone('search', 18)),
             campoFiltro),
           btnRecarregar)),
+      selecao.barra,
       h('div', { class: 'painel overflow-hidden' }, corpoTabela))));
 
   renderTabela();
@@ -106,12 +113,13 @@ function miniatura(v) {
   return h('div', { class: 'bandeja h-[58px] w-[104px] shrink-0 overflow-hidden p-0' }, capa);
 }
 
-function linha(v, estado) {
+function linha(v, estado, caixaSelecao) {
   const acao = (icon, rotulo, attrs) =>
     h(attrs.href ? 'a' : 'button', { type: attrs.href ? null : 'button', class: 'btn-icone', 'aria-label': `${rotulo}: ${v.titulo}`, title: rotulo, ...attrs },
       icone(icon, 20));
 
   return h('tr', {},
+    h('td', { class: '!pr-0' }, caixaSelecao),
     h('td', {},
       h('div', { class: 'flex items-center gap-4' },
         miniatura(v),

@@ -10,12 +10,19 @@ import { toast } from './componentes.js';
 export function filtrar(videos, { busca = '', categoria = '', tagsSelecionadas = [] }) {
   const termos = normalizar(busca).split(/\s+/).filter(Boolean);
   const tags = tagsSelecionadas.map((t) => t.toLowerCase());
-  return videos.filter((v) => {
+  const resultado = [];
+  for (const v of videos) {
     const doVideo = (v.tags ?? []).map((t) => t.toLowerCase());
-    return (!categoria || v.categoria === categoria) &&
-      termos.every((t) => normalizar(v.titulo).includes(t)) &&
-      tags.every((t) => doVideo.includes(t));
-  });
+    if (categoria && v.categoria !== categoria) continue;
+    if (!tags.every((t) => doVideo.includes(t))) continue;
+    // Busca em título, descrição, tags e categoria (cada termo pode estar em qualquer um deles).
+    const titulo = normalizar(v.titulo);
+    const texto = `${titulo} ${normalizar(v.descricao)} ${normalizar(doVideo.join(' '))} ${normalizar(v.categoria)}`;
+    if (!termos.every((t) => texto.includes(t))) continue;
+    resultado.push({ v, noTitulo: termos.every((t) => titulo.includes(t)) });
+  }
+  // Quem bate no título vem primeiro; dentro de cada grupo, a ordem original (mais recentes antes).
+  return [...resultado.filter((r) => r.noTitulo), ...resultado.filter((r) => !r.noTitulo)].map((r) => r.v);
 }
 
 /** Barra de tags clicáveis acima do catálogo (filtro). Só aparece quando o acervo tem tags. */

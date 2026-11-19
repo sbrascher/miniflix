@@ -202,6 +202,50 @@ public sealed class CatalogService
     }
 
     /// <summary>
+    /// Adiciona e/ou remove tags de vários vídeos de uma vez (as demais tags de cada vídeo continuam).
+    /// Valida tudo antes de gravar: se algum vídeo passaria do limite de tags, nenhum é alterado.
+    /// Retorna quantos vídeos mudaram de fato.
+    /// </summary>
+    public int AlterarTagsEmMassa(IEnumerable<string> slugs, IEnumerable<string?> adicionar, IEnumerable<string?> remover)
+    {
+        var novas = NormalizarTags(adicionar);
+        var tirar = remover.Select(t => (t ?? "").Trim()).Where(t => t.Length > 0).ToList();
+        if (novas.Count == 0 && tirar.Count == 0) throw new ArgumentException("Informe ao menos uma tag.");
+
+        var lista = slugs.Distinct(StringComparer.Ordinal).ToList();
+        if (lista.Count == 0) throw new ArgumentException("Nenhum vídeo selecionado.");
+
+        // 1) Calcula tudo (e valida) sem gravar nada.
+        var gravar = new List<(string Arquivo, VideoMeta Meta)>();
+        foreach (var slug in lista)
+        {
+            var arquivo = Path.Combine(PastaDoVideo(slug), slug + ".json");
+            var meta = JsonStore.Ler<VideoMeta>(arquivo) ?? throw new KeyNotFoundException($"Vídeo não encontrado: {slug}.");
+            var atuais = meta.Tags ?? [];
+            var resultado = atuais.Where(t => !tirar.Contains(t.Trim(), StringComparer.OrdinalIgnoreCase)).ToList();
+            foreach (var t in novas)
+                if (!resultado.Contains(t, StringComparer.OrdinalIgnoreCase)) resultado.Add(t);
+            if (resultado.Count > MaxTags)
+                throw new ArgumentException($"“{meta.Titulo}” ficaria com {resultado.Count} tags; o máximo é {MaxTags}. Nada foi alterado.");
+            if (resultado.SequenceEqual(atuais)) continue;
+            meta.Tags = resultado;
+            gravar.Add((arquivo, meta));
+        }
+
+        // 2) Grava só o que mudou.
+        try
+        {
+            foreach (var (arquivo, meta) in gravar) JsonStore.Gravar(arquivo, meta);
+        }
+        finally
+        {
+            Log.Info($"Tags em massa (+{string.Join(", ", novas)} −{string.Join(", ", tirar)}): {gravar.Count} vídeo(s).");
+            if (gravar.Count > 0) Varrer();
+        }
+        return gravar.Count;
+    }
+
+    /// <summary>
     /// Troca a categoria de todos os vídeos de <paramref name="antiga"/> para <paramref name="nova"/>.
     /// Se <paramref name="nova"/> já existir (outra categoria), as duas são unidas usando a grafia existente;
     /// vazia ou "Sem categoria" tira a categoria dos vídeos. Retorna quantos vídeos foram alterados.

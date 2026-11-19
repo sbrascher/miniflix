@@ -377,6 +377,60 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Empty(Assert.Single(cat.Itens).Meta.Tags);
     }
 
+    // ---------- Tags em massa ----------
+
+    private List<string> TagsNoDisco(string slug) =>
+        JsonStore.Ler<VideoMeta>(Path.Combine(Videos, slug, slug + ".json"))!.Tags;
+
+    [Fact]
+    public void Tags_em_massa_adiciona_sem_duplicar_e_mantem_as_existentes()
+    {
+        CriarVideo("a");
+        CriarVideo("b");
+        CriarVideo("c");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("a", "A", "", "", ["Python"]);
+
+        Assert.Equal(2, cat.AlterarTagsEmMassa(["a", "b"], ["python", "iniciante"], []));
+        Assert.Equal(["Python", "iniciante"], TagsNoDisco("a")); // "python" reaproveita a grafia "Python"
+        Assert.Equal(["Python", "iniciante"], TagsNoDisco("b"));
+        Assert.Empty(TagsNoDisco("c"));
+        Assert.Equal(0, cat.AlterarTagsEmMassa(["a", "b"], ["iniciante"], [])); // nada muda
+    }
+
+    [Fact]
+    public void Tags_em_massa_remove_sem_diferenciar_maiusculas()
+    {
+        CriarVideo("a");
+        CriarVideo("b");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("a", "A", "", "", ["Python", "iniciante"]);
+        cat.Editar("b", "B", "", "", ["iniciante"]);
+
+        Assert.Equal(2, cat.AlterarTagsEmMassa(["a", "b"], [], ["INICIANTE"]));
+        Assert.Equal(["Python"], TagsNoDisco("a"));
+        Assert.Empty(TagsNoDisco("b"));
+        Assert.Equal(["Python"], cat.Tags());
+    }
+
+    [Fact]
+    public void Tags_em_massa_valida_tudo_antes_de_gravar()
+    {
+        CriarVideo("a");
+        CriarVideo("cheio");
+        var cat = Novo();
+        cat.Varrer();
+        cat.Editar("cheio", "Cheio", "", "", Enumerable.Range(1, CatalogService.MaxTags).Select(i => $"t{i}"));
+
+        Assert.Throws<ArgumentException>(() => cat.AlterarTagsEmMassa(["a", "cheio"], ["nova"], []));
+        Assert.Empty(TagsNoDisco("a")); // nenhum vídeo foi alterado
+        Assert.Throws<ArgumentException>(() => cat.AlterarTagsEmMassa(["a"], [" "], []));
+        Assert.Throws<ArgumentException>(() => cat.AlterarTagsEmMassa([], ["x"], []));
+        Assert.ThrowsAny<Exception>(() => cat.AlterarTagsEmMassa([".."], ["x"], []));
+    }
+
     // ---------- Renomear categoria ----------
 
     private string CategoriaNoDisco(string slug) =>

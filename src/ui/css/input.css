@@ -802,6 +802,33 @@
   .tabela tbody tr { transition: background-color var(--rapido); }
   .tabela tbody tr:hover { background: color-mix(in srgb, var(--afundado) 55%, transparent); }
   .tabela tbody tr + tr td { box-shadow: inset 0 1px 0 var(--borda); }
+  .tabela tbody tr.linha-selecionada { background: color-mix(in srgb, var(--marca) 12%, transparent); }
+
+  /* Caixa de seleção nativa (acessível) com a cor da marca. */
+  .caixa-selecao {
+    width: 1.15rem;
+    height: 1.15rem;
+    accent-color: var(--marca);
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .caixa-selecao:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+
+  /* Barra de ações em massa: fica grudada abaixo do cabeçalho enquanto se rola a tabela. */
+  .barra-selecao {
+    position: sticky;
+    top: 5.25rem;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: var(--raio-lg);
+    background: var(--superficie);
+    box-shadow: var(--relevo-2);
+  }
 
   .lista-divisoria > * + * { box-shadow: inset 0 1px 0 var(--borda); }
 
@@ -878,7 +905,7 @@
 @media (forced-colors: active) {
   .painel, .bandeja, .pastilha, .btn, .btn-primario, .btn-perigo, .btn-icone-elevado,
   .campo, .chip, .card-video, .card-video-capa, .moldura-player, .modal, .toast, .trilho,
-  .tecla, .osd, .aviso-retomar, .card-remover, .toast-acao, .deslizante {
+  .tecla, .osd, .aviso-retomar, .card-remover, .toast-acao, .deslizante, .barra-selecao {
     border: 1px solid CanvasText;
   }
   .trilho-preenchimento { background: Highlight; }

@@ -41,8 +41,47 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
 
     public static string UrlCanonica(string id) => $"https://www.youtube.com/watch?v={id}";
 
+    // ---------- Vários links de uma vez ----------
+
+    public const int MaxLinksPorVez = 500;
+
+    // Qualquer coisa com cara de endereço: http(s)://… ou youtube.com/… / youtu.be/… sem o "https://".
+    [GeneratedRegex(@"(?:https?://|(?:www\.|m\.|music\.)?youtube(?:-nocookie)?\.com/|youtu\.be/)[^\s<>""'，、]+",
+        RegexOptions.IgnoreCase)]
+    private static partial Regex PareceLink();
+
+    /// <summary>Um link encontrado no texto colado: o ID do vídeo, ou o motivo de não servir.</summary>
+    public sealed record LinkColado(string Texto, string? Id, string? Motivo);
+
+    /// <summary>
+    /// Encontra os links num texto livre (um por linha, separados por espaço/vírgula ou no meio de uma
+    /// mensagem) e extrai o ID de cada um, na ordem em que aparecem.
+    /// </summary>
+    public static IReadOnlyList<LinkColado> ExtrairLinks(string? texto)
+    {
+        var lista = new List<LinkColado>();
+        foreach (Match m in PareceLink().Matches(texto ?? ""))
+        {
+            var link = m.Value.TrimEnd('.', ',', ';', ')', ']', '!', '?');
+            var id = ExtrairId(link);
+            string? motivo = null;
+            if (id is null)
+            {
+                var minusculo = link.ToLowerInvariant();
+                motivo = !minusculo.Contains("youtu") ? "Não é um link do YouTube."
+                    : minusculo.Contains("list=") || minusculo.Contains("/playlist") ? "Playlist sem um vídeo específico (ainda não suportado)."
+                    : minusculo.Contains("/@") || minusculo.Contains("/channel/") || minusculo.Contains("/c/") ? "Link de canal, não de um vídeo."
+                    : "Não foi possível identificar o vídeo neste link.";
+            }
+            lista.Add(new LinkColado(link, id, motivo));
+            if (lista.Count > MaxLinksPorVez)
+                throw new ArgumentException($"São mais de {MaxLinksPorVez} links. Divida em partes menores.");
+        }
+        return lista;
+    }
+
     /// <summary>Valida a URL e cria o item da fila. Lança ArgumentException com mensagem amigável.</summary>
-    public FilaItem CriarItem(string url, string categoria)
+    public FilaItem CriarItem(string url, string categoria, IReadOnlyList<string>? tags = null)
     {
         var id = ExtrairId(url) ?? throw new ArgumentException(
             "Link do YouTube inválido. Use o endereço de um vídeo, por exemplo https://www.youtube.com/watch?v=…");
@@ -55,11 +94,11 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
             Titulo = "Vídeo do YouTube",
             Categoria = categoria.Trim(),
             Origem = UrlCanonica(id),
-            Executor = (item, relator, ct) => ExecutarAsync(item, id, relator, ct),
+            Executor = (item, relator, ct) => ExecutarAsync(item, id, tags ?? [], relator, ct),
         };
     }
 
-    private async Task ExecutarAsync(FilaItem item, string id, Relator relator, CancellationToken ct)
+    private async Task ExecutarAsync(FilaItem item, string id, IReadOnlyList<string> tags, Relator relator, CancellationToken ct)
     {
         var ytDlp = Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
         var ffmpeg = Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
@@ -135,6 +174,7 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
                 Titulo = meta.Titulo,
                 Descricao = meta.Descricao,
                 Categoria = item.Categoria,
+                Tags = catalogo.NormalizarTags(tags),
                 Origem = "youtube",
                 UrlOrigem = url,
                 DuracaoSegundos = Math.Round(meta.Duracao, 2),

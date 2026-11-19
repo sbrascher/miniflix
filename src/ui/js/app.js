@@ -1,5 +1,5 @@
 import { bridge } from './bridge.js';
-import { h } from './util.js';
+import { h, plural } from './util.js';
 import { icone } from './icones.js';
 import { renderCatalogo, focarAposRemocao } from './catalogo.js';
 import { renderPlayer } from './player.js';
@@ -141,21 +141,42 @@ bridge.on('catalogo.atualizado', async () => {
 
 // ---------- Fila ----------
 const estadosAnteriores = new Map();
+// "Rodada" = tudo o que passou pela fila desde a última vez que ela ficou parada.
+// Com um item só, avisa ao terminar; com vários (lote do YouTube, pasta inteira), um resumo no fim.
+const rodada = { itens: new Set(), concluidos: 0, erros: 0 };
 
 function aoMudarFila(itens) {
-  // Avisa quando um item termina (útil se o usuário estiver no catálogo assistindo outra coisa).
+  const ocupada = itens.some((i) => i.estado === 'aguardando' || i.estado === 'processando');
+  for (const i of itens) if (i.estado === 'aguardando' || i.estado === 'processando') rodada.itens.add(i.id);
+  const emLote = rodada.itens.size > 1;
+
   for (const i of itens) {
     const antes = estadosAnteriores.get(i.id);
     if (antes && antes !== i.estado) {
-      if (i.estado === 'concluido') toast(`“${i.titulo}” foi adicionado ao catálogo.`);
-      else if (i.estado === 'erro') toast(`Falha em “${i.titulo}”: ${i.mensagem}`, 'erro');
+      if (i.estado === 'concluido') {
+        rodada.concluidos++;
+        if (!emLote) toast(`“${i.titulo}” foi adicionado ao catálogo.`);
+      } else if (i.estado === 'erro') {
+        rodada.erros++;
+        if (!emLote) toast(`Falha em “${i.titulo}”: ${i.mensagem}`, 'erro');
+      }
     }
     estadosAnteriores.set(i.id, i.estado);
   }
   atualizarFila(itens);
 
+  if (!ocupada && rodada.itens.size) {
+    if (emLote && rodada.concluidos + rodada.erros > 0) {
+      const partes = [`${plural(rodada.concluidos, 'vídeo adicionado', 'vídeos adicionados')} ao catálogo`];
+      if (rodada.erros) partes.push(`${plural(rodada.erros, 'com erro', 'com erro')} (detalhes na fila da Administração)`);
+      toast(`Fila concluída: ${partes.join(', ')}.`, rodada.erros ? 'erro' : 'ok');
+    }
+    rodada.itens.clear();
+    rodada.concluidos = 0;
+    rodada.erros = 0;
+  }
+
   // Indicador na engrenagem enquanto há trabalho em andamento.
-  const ocupada = itens.some((i) => i.estado === 'aguardando' || i.estado === 'processando');
   const btn = $('#btn-admin');
   btn.querySelector('.indicador')?.remove();
   if (ocupada) btn.append(h('span', { class: 'indicador animate-pulse', 'aria-hidden': 'true' }));

@@ -36,6 +36,49 @@ public sealed class DownloadYoutubeTests : IDisposable
     [InlineData("javascript:alert(1)")]
     public void Rejeita_urls_invalidas(string? url) => Assert.Null(DownloadYoutube.ExtrairId(url));
 
+    // ---------- Vários links de uma vez ----------
+
+    [Fact]
+    public void Extrai_varios_links_de_um_texto_livre()
+    {
+        var texto = """
+            https://www.youtube.com/watch?v=AAAAAAAAAAA
+            https://youtu.be/BBBBBBBBBBB?si=x, youtube.com/shorts/CCCCCCCCCCC
+            Olha esse aqui: https://m.youtube.com/watch?v=DDDDDDDDDDD&t=10s. E esse (www.youtube.com/watch?v=EEEEEEEEEEE)!
+            https://www.youtube.com/watch?v=AAAAAAAAAAA
+            """;
+        var ids = DownloadYoutube.ExtrairLinks(texto).Select(l => l.Id).ToList();
+        Assert.Equal(["AAAAAAAAAAA", "BBBBBBBBBBB", "CCCCCCCCCCC", "DDDDDDDDDDD", "EEEEEEEEEEE", "AAAAAAAAAAA"], ids);
+    }
+
+    [Theory]
+    [InlineData("https://vimeo.com/123456", "Não é um link do YouTube.")]
+    [InlineData("https://www.youtube.com/playlist?list=PL123", "Playlist sem um vídeo específico (ainda não suportado).")]
+    [InlineData("https://www.youtube.com/@meucanal", "Link de canal, não de um vídeo.")]
+    [InlineData("https://www.youtube.com/watch?v=curto", "Não foi possível identificar o vídeo neste link.")]
+    public void Link_invalido_explica_o_motivo(string link, string motivo)
+    {
+        var l = Assert.Single(DownloadYoutube.ExtrairLinks($"texto {link} mais texto"));
+        Assert.Null(l.Id);
+        Assert.Equal(motivo, l.Motivo);
+    }
+
+    [Fact]
+    public void Video_de_playlist_vale_so_o_video()
+    {
+        var l = Assert.Single(DownloadYoutube.ExtrairLinks("https://www.youtube.com/watch?v=AAAAAAAAAAA&list=PL123&index=2"));
+        Assert.Equal("AAAAAAAAAAA", l.Id);
+    }
+
+    [Fact]
+    public void Texto_sem_links_e_limite()
+    {
+        Assert.Empty(DownloadYoutube.ExtrairLinks("nenhum link aqui"));
+        Assert.Empty(DownloadYoutube.ExtrairLinks(null));
+        var muitos = string.Join('\n', Enumerable.Range(0, DownloadYoutube.MaxLinksPorVez + 1).Select(i => $"https://youtu.be/{i:D11}"));
+        Assert.Throws<ArgumentException>(() => DownloadYoutube.ExtrairLinks(muitos));
+    }
+
     [Fact]
     public void CriarItem_recusa_video_ja_no_catalogo()
     {

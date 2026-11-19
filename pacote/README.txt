@@ -69,9 +69,19 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     Arquivos repetidos dentro da própria seleção entram uma vez só.
 
   BAIXAR DO YOUTUBE (precisa de internet)
-    1. Cole o link do vídeo no campo "Link do vídeo".
+    1. Cole o link do vídeo no campo "Links dos vídeos".
     2. Escolha a categoria e clique em "Baixar".
     O vídeo é salvo em até 1080p, com capa e descrição.
+
+    VÁRIOS VÍDEOS DE UMA VEZ
+      Cole vários links no mesmo campo: um por linha, separados por
+      espaço ou vírgula, ou até um texto inteiro com links no meio
+      (de uma conversa, por exemplo). Antes de baixar, aparece a
+      lista para conferir: os novos (marcados), os que já estão no
+      catálogo ou na fila, os repetidos e os links que não servem
+      (playlists, canais, outros sites). Categoria e tags valem para
+      todos. Os vídeos são baixados um de cada vez; se algum falhar,
+      os outros continuam, e no fim aparece um resumo.
 
   A FILA
     Os vídeos são processados um por vez. A fila mostra o progresso e

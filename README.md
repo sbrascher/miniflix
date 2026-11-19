@@ -20,6 +20,7 @@
 - ▶️ **Player** completo: velocidade de reprodução, tela cheia e atalhos de teclado no estilo do YouTube (`Espaço`, `J`/`L`, setas, `F`, `M`, `0`–`9`).
 - ⏯️ **Continuar assistindo:** o MiniFlix lembra onde você parou em cada vídeo.
 - ⬇️ **Adicionar do YouTube** colando a URL. A fila baixa um vídeo por vez e mostra o progresso em tempo real.
+- 📋 **Vários links do YouTube de uma vez:** cola uma lista (ou um texto com links), confere novos/já no catálogo/repetidos/inválidos e baixa em lote, com resumo no fim.
 - 🔁 **Reconhece vídeos já importados** (tamanho + amostras do início, meio e fim do arquivo — não o nome), com opção de reimportar mantendo título, tags, favorito, capa e progresso; **importação de pastas inteiras** com subpastas (categoria pelo nome da subpasta).
 - 📁 **Importar vídeos do computador** sem perder qualidade: o que o player toca é copiado bit a bit; áudio incompatível vira FLAC (sem perda); só vídeos que não tocam (HEVC, WMV…) são reconvertidos, em alta qualidade e na resolução original.
 - 🗂️ **Gerenciar o acervo:** editar título, categoria, tags e descrição, ou excluir vídeos.

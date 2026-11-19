@@ -307,6 +307,46 @@ internal sealed class MainForm : Form
             return new { adicionados = novos.Count };
         });
 
+        // Vários links: primeiro a conferência (sem internet: só classifica), depois o lote vai para a fila.
+        _bridge.Registrar("youtube.analisarLinks", d =>
+        {
+            var links = DownloadYoutube.ExtrairLinks(d?["texto"]?.GetValue<string>());
+            var naFila = _fila.Itens.Where(i => !i.Finalizado && i.Tipo == "youtube").Select(i => i.Origem).ToHashSet();
+            var vistos = new HashSet<string>();
+            var novos = new List<object>();
+            var existentes = new List<object>();
+            var jaNaFila = new List<object>();
+            var repetidos = new List<object>();
+            var invalidos = new List<object>();
+            foreach (var l in links)
+            {
+                if (l.Id is null) { invalidos.Add(new { texto = l.Texto, motivo = l.Motivo }); continue; }
+                if (!vistos.Add(l.Id)) { repetidos.Add(new { texto = l.Texto, id = l.Id }); continue; }
+                if (_catalogo.ObterPorId("yt:" + l.Id) is { } e) existentes.Add(new { texto = l.Texto, id = l.Id, e.Meta.Titulo, e.Meta.Slug });
+                else if (naFila.Contains(DownloadYoutube.UrlCanonica(l.Id))) jaNaFila.Add(new { texto = l.Texto, id = l.Id });
+                else novos.Add(new { texto = l.Texto, id = l.Id });
+            }
+            return new { total = links.Count, novos, existentes, naFila = jaNaFila, repetidos, invalidos };
+        });
+
+        _bridge.Registrar("fila.adicionarYoutubeLote", d =>
+        {
+            ExigirPastaDisponivel();
+            Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
+            Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
+            var categoria = d?["categoria"]?.GetValue<string>() ?? "";
+            if (categoria.Trim().Length > CatalogService.MaxCategoria) throw new ArgumentException("Categoria muito longa.");
+            var tags = _catalogo.NormalizarTags((d?["tags"] as JsonArray)?.Select(t => t?.GetValue<string>()) ?? []);
+            var ids = (d?["ids"] as JsonArray)?.Select(n => n?.GetValue<string>()).OfType<string>().Distinct().ToList()
+                      ?? throw new ArgumentException("Nenhum vídeo informado.");
+            var naFila = _fila.Itens.Where(i => !i.Finalizado && i.Tipo == "youtube").Select(i => i.Origem).ToHashSet();
+            // Cria todos antes de enfileirar: um ID inválido não deixa o lote pela metade.
+            var itens = ids.Where(id => !naFila.Contains(DownloadYoutube.UrlCanonica(id)))
+                .Select(id => _youtube.CriarItem(DownloadYoutube.UrlCanonica(id), categoria, tags)).ToList();
+            foreach (var item in itens) _fila.Adicionar(item);
+            return new { adicionados = itens.Count };
+        });
+
         _bridge.Registrar("fila.adicionarYoutube", d =>
         {
             ExigirPastaDisponivel();

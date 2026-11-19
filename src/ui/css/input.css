@@ -402,6 +402,34 @@
   }
   .chip-pequeno { padding: 0.1rem 0.55rem; font-size: 0.7rem; font-weight: 500; }
 
+  /* ---------- Transcrição (player) ---------- */
+  .transcricao > summary { list-style: none; }
+  .transcricao > summary::-webkit-details-marker { display: none; }
+  .transcricao > summary:focus-visible { outline: 2px solid var(--destaque); outline-offset: -2px; border-radius: var(--raio-lg); }
+  .transcricao-paragrafo {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--raio-md);
+    line-height: 1.6;
+    transition: background-color var(--rapido);
+  }
+  .transcricao-paragrafo.atual { background: color-mix(in srgb, var(--marca) 14%, transparent); }
+  .transcricao-tempo {
+    flex-shrink: 0;
+    align-self: flex-start;
+    padding: 0.05rem 0.45rem;
+    border-radius: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--destaque);
+    background: var(--afundado);
+    cursor: pointer;
+  }
+  .transcricao-tempo:hover { text-decoration: underline; }
+  .transcricao-tempo:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+
   /* ---------- Seções do catálogo (acordeão) ---------- */
   .secao { margin-bottom: 3.5rem; }
   .secao > h2 { margin-bottom: 1.25rem; }
@@ -432,6 +460,15 @@
   }
   .secao-alternar:hover .secao-seta { color: var(--destaque); }
   .secao[data-recolhida] .secao-seta { transform: rotate(-90deg); }
+  .secao-descricao {
+    max-width: 48rem;
+    margin: -0.75rem 0 1.25rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--suave);
+    white-space: pre-line;
+  }
+  .secao[data-recolhida] > .secao-descricao { display: none; }
 
   /* ---------- Tags ---------- */
   /* Chip que liga/desliga um filtro (catálogo) ou leva ao catálogo filtrado (player). */

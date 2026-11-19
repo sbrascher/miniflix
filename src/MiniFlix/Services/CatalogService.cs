@@ -211,6 +211,35 @@ public sealed class CatalogService
         return Obter(slug) ?? throw new InvalidOperationException("Vídeo sumiu após a edição.");
     }
 
+    /// <summary>
+    /// Grava a transcrição do vídeo: o .md (e a legenda .vtt original, para o player usar depois) ao lado
+    /// do vídeo, e o idioma/origem no .json. Gravação atômica: um .md pela metade nunca substitui o anterior.
+    /// </summary>
+    public VideoItem SalvarTranscricao(string slug, string markdown, string? vtt, Transcricao.Escolha escolha)
+    {
+        lock (_travaEscrita)
+        {
+            var pasta = PastaDoVideo(slug);
+            void GravarAtomico(string destino, string conteudo)
+            {
+                var tmp = destino + ".tmp";
+                File.WriteAllText(tmp, conteudo, new System.Text.UTF8Encoding(false));
+                File.Move(tmp, destino, overwrite: true);
+            }
+            GravarAtomico(Path.Combine(pasta, slug + Transcricao.SufixoMarkdown), markdown);
+            if (vtt is not null) GravarAtomico(Path.Combine(pasta, slug + Transcricao.SufixoLegenda), vtt);
+
+            var arquivoJson = Path.Combine(pasta, slug + ".json");
+            var meta = JsonStore.Ler<VideoMeta>(arquivoJson) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+            meta.TranscricaoIdioma = escolha.Chave;
+            meta.TranscricaoAutomatica = escolha.Automatica;
+            JsonStore.Gravar(arquivoJson, meta);
+            Log.Info($"Transcrição salva: {slug} ({escolha.Chave}{(escolha.Automatica ? ", automática" : "")})");
+        }
+        Varrer();
+        return Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+    }
+
     /// <summary>Marca ou desmarca o vídeo como favorito.</summary>
     public VideoItem DefinirFavorito(string slug, bool favorito)
     {
@@ -328,6 +357,80 @@ public sealed class CatalogService
     public int RenomearCategoria(string antiga, string? nova)
     {
         lock (_travaEscrita) return RenomearCategoriaCore(antiga, nova);
+    }
+
+    // ---------- Descrição das categorias ----------
+    // Fica na própria pasta dos vídeos (acompanha o acervo em backups e na troca de pasta); a varredura
+    // só lê subpastas, então o arquivo não atrapalha.
+
+    public const int MaxDescricaoCategoria = 500;
+    private const string NomeArquivoCategorias = "_categorias.json";
+    private string ArquivoCategorias => Path.Combine(_pastaVideos, NomeArquivoCategorias);
+
+    /// <summary>Descrição de cada categoria (só as que têm), sem diferenciar maiúsculas no nome.</summary>
+    public IReadOnlyDictionary<string, string> DescricoesCategorias()
+    {
+        var lidas = JsonStore.LerSeguro<Dictionary<string, string>>(ArquivoCategorias) ?? [];
+        return new Dictionary<string, string>(lidas, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Define (ou apaga, se vazia) a descrição de uma categoria.</summary>
+    public void DefinirDescricaoCategoria(string categoria, string? descricao)
+    {
+        lock (_travaEscrita) DefinirDescricaoCore(categoria, descricao);
+        Alterado?.Invoke(); // a varredura não percebe: avisa a UI diretamente
+    }
+
+    private void DefinirDescricaoCore(string categoria, string? descricao)
+    {
+        categoria = (categoria ?? "").Trim();
+        descricao = (descricao ?? "").Trim();
+        if (categoria.Length == 0 || categoria.Equals(SemCategoria, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("“Sem categoria” não tem descrição.");
+        if (descricao.Length > MaxDescricaoCategoria)
+            throw new ArgumentException($"A descrição da categoria pode ter no máximo {MaxDescricaoCategoria} caracteres.");
+
+        var todas = new Dictionary<string, string>(DescricoesCategorias(), StringComparer.OrdinalIgnoreCase);
+        var chave = todas.Keys.FirstOrDefault(k => k.Equals(categoria, StringComparison.OrdinalIgnoreCase));
+        if (chave is not null) todas.Remove(chave);
+        if (descricao.Length > 0) todas[categoria] = descricao;
+        JsonStore.Gravar(ArquivoCategorias, todas.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(p => p.Key, p => p.Value));
+    }
+
+    /// <summary>
+    /// Edita uma categoria: renomeia (todos os vídeos dela; se o nome novo já existir, une) e define a
+    /// descrição (null = manter). A descrição acompanha o nome novo. Retorna quantos vídeos mudaram.
+    /// </summary>
+    public int EditarCategoria(string antiga, string? nova, string? descricao)
+    {
+        int alterados;
+        lock (_travaEscrita)
+        {
+            antiga = (antiga ?? "").Trim();
+            if (descricao is not null && descricao.Trim().Length > MaxDescricaoCategoria)
+                throw new ArgumentException($"A descrição da categoria pode ter no máximo {MaxDescricaoCategoria} caracteres.");
+            var descricaoAntiga = DescricoesCategorias().GetValueOrDefault(antiga);
+            alterados = RenomearCategoriaCore(antiga, nova);
+
+            // Nome final (com a grafia de uma categoria existente, se houve união).
+            var final = (nova ?? "").Trim();
+            if (final.Equals(SemCategoria, StringComparison.OrdinalIgnoreCase)) final = "";
+            final = Categorias().FirstOrDefault(c => c.Equals(final, StringComparison.OrdinalIgnoreCase)) ?? final;
+
+            if (final.Length > 0 && final != SemCategoria)
+            {
+                var descricaoFinal = DescricoesCategorias().GetValueOrDefault(final);
+                // Pedida explicitamente > a que o destino já tinha (união) > a da categoria antiga.
+                var aplicar = descricao ?? descricaoFinal ?? descricaoAntiga;
+                if (aplicar != descricaoFinal) DefinirDescricaoCore(final, aplicar);
+            }
+            if (!antiga.Equals(final, StringComparison.OrdinalIgnoreCase) && descricaoAntiga is not null
+                && antiga != SemCategoria)
+                DefinirDescricaoCore(antiga, null); // o nome antigo deixou de existir
+        }
+        Alterado?.Invoke();
+        return alterados;
     }
 
     private int RenomearCategoriaCore(string antiga, string? nova)
@@ -597,7 +700,9 @@ public sealed class CatalogService
             .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         var capa = new FileInfo(Path.Combine(pasta, meta.Slug + ".jpg"));
-        return new VideoItem(meta, _paraUrl(mp4.FullName), capa.Exists ? UrlVersionada(capa) : null, mp4.Length);
+        var transcricao = new FileInfo(Path.Combine(pasta, meta.Slug + Transcricao.SufixoMarkdown));
+        return new VideoItem(meta, _paraUrl(mp4.FullName), capa.Exists ? UrlVersionada(capa) : null, mp4.Length,
+            transcricao.Exists ? UrlVersionada(transcricao) : null);
     }
 
     /// <summary>URL com a data de modificação: quando a capa muda, o navegador não usa a imagem antiga do cache.</summary>
@@ -615,6 +720,7 @@ public sealed class CatalogService
             if (x.Meta.Slug != y.Meta.Slug || x.Meta.Titulo != y.Meta.Titulo || x.Meta.Categoria != y.Meta.Categoria ||
                 x.Meta.Descricao != y.Meta.Descricao || x.Meta.DuracaoSegundos != y.Meta.DuracaoSegundos ||
                 !x.Meta.Tags.SequenceEqual(y.Meta.Tags) || x.Meta.Favorito != y.Meta.Favorito || x.VideoUrl != y.VideoUrl ||
+                x.TranscricaoUrl != y.TranscricaoUrl || x.Meta.TranscricaoIdioma != y.Meta.TranscricaoIdioma ||
                 x.CapaUrl != y.CapaUrl || x.TamanhoBytes != y.TamanhoBytes)
                 return false;
         }

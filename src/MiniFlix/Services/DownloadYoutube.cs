@@ -80,8 +80,86 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
         return lista;
     }
 
+    // ---------- Transcrição (legendas) ----------
+
+    /// <summary>
+    /// Baixa a melhor legenda do vídeo (português; se não houver, inglês) e grava a transcrição em .md
+    /// na pasta do vídeo. <paramref name="infoJson"/>: JSON do yt-dlp já obtido (evita uma consulta a mais).
+    /// Retorna a legenda usada. Lança InvalidOperationException com mensagem amigável se não houver legenda.
+    /// </summary>
+    public async Task<Transcricao.Escolha> BaixarTranscricaoAsync(string id, string slug, string? infoJson, CancellationToken ct)
+    {
+        var ytDlp = Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
+        var ffmpeg = Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
+        var url = UrlCanonica(id);
+
+        if (infoJson is null)
+        {
+            var json = new StringBuilder();
+            var r0 = await Processo.ExecutarAsync(ytDlp, [.. ArgumentosBase(ffmpeg), "--dump-single-json", "--skip-download", url],
+                ct, aoLerSaida: l => json.AppendLine(l), ambiente: Ambiente());
+            if (r0.CodigoSaida != 0) throw new InvalidOperationException(TraduzirErro(r0.UltimasLinhasErro));
+            infoJson = json.ToString();
+        }
+        using var doc = JsonDocument.Parse(infoJson);
+        var escolha = Transcricao.Escolher(doc.RootElement)
+            ?? throw new InvalidOperationException("Este vídeo não tem legenda em português nem em inglês.");
+        var titulo = doc.RootElement.TryGetProperty("title", out var t) ? t.GetString() ?? id : id;
+
+        var pasta = Path.Combine(Path.GetTempPath(), "miniflix-legenda-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(pasta);
+        try
+        {
+            var r = await Processo.ExecutarAsync(ytDlp,
+                [.. ArgumentosBase(ffmpeg), "--skip-download", escolha.Automatica ? "--write-auto-subs" : "--write-subs",
+                 "--sub-langs", escolha.Chave, "--sub-format", "vtt", "--output", Path.Combine(pasta, "legenda.%(ext)s"), url],
+                ct, ambiente: Ambiente());
+            var arquivo = Directory.GetFiles(pasta, "*.vtt").FirstOrDefault();
+            if (r.CodigoSaida != 0 || arquivo is null)
+                throw new InvalidOperationException(r.CodigoSaida != 0 ? TraduzirErro(r.UltimasLinhasErro) : "A legenda não pôde ser baixada.");
+
+            var vtt = await File.ReadAllTextAsync(arquivo, ct);
+            var trechos = Transcricao.LerVtt(vtt);
+            if (trechos.Count == 0) throw new InvalidOperationException("A legenda do vídeo está vazia.");
+            var md = Transcricao.GerarMarkdown(catalogo.Obter(slug)?.Meta.Titulo ?? titulo, url, escolha, trechos, DateTime.Now);
+            catalogo.SalvarTranscricao(slug, md, vtt, escolha);
+            return escolha;
+        }
+        finally
+        {
+            try { Directory.Delete(pasta, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Texto curto para a fila: "Transcrição em português (legenda do autor)."</summary>
+    public static string MensagemTranscricao(Transcricao.Escolha e) =>
+        $"Transcrição em {e.NomeIdioma} ({(e.Automatica ? "legenda automática" : "legenda do autor")}).";
+
+    /// <summary>Item da fila que só baixa a transcrição de um vídeo do YouTube que já está no catálogo.</summary>
+    public FilaItem CriarItemTranscricao(string slug)
+    {
+        var item = catalogo.Obter(slug) ?? throw new KeyNotFoundException("Vídeo não encontrado.");
+        if (!item.Meta.Id.StartsWith("yt:"))
+            throw new ArgumentException("Por enquanto, só vídeos baixados do YouTube têm transcrição (pelas legendas).");
+        var id = item.Meta.Id[3..];
+        return new FilaItem
+        {
+            Tipo = "transcricao",
+            Titulo = item.Meta.Titulo,
+            Categoria = item.Meta.Categoria,
+            Origem = UrlCanonica(id),
+            Executor = async (fi, relator, ct) =>
+            {
+                relator.Etapa("Baixando a transcrição", 0, 1);
+                var escolha = await BaixarTranscricaoAsync(id, slug, null, ct);
+                fi.Slug = slug;
+                fi.Mensagem = MensagemTranscricao(escolha);
+            },
+        };
+    }
+
     /// <summary>Valida a URL e cria o item da fila. Lança ArgumentException com mensagem amigável.</summary>
-    public FilaItem CriarItem(string url, string categoria, IReadOnlyList<string>? tags = null)
+    public FilaItem CriarItem(string url, string categoria, IReadOnlyList<string>? tags = null, bool transcricao = false)
     {
         var id = ExtrairId(url) ?? throw new ArgumentException(
             "Link do YouTube inválido. Use o endereço de um vídeo, por exemplo https://www.youtube.com/watch?v=…");
@@ -94,11 +172,12 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
             Titulo = "Vídeo do YouTube",
             Categoria = categoria.Trim(),
             Origem = UrlCanonica(id),
-            Executor = (item, relator, ct) => ExecutarAsync(item, id, tags ?? [], relator, ct),
+            Executor = (item, relator, ct) => ExecutarAsync(item, id, tags ?? [], transcricao, relator, ct),
         };
     }
 
-    private async Task ExecutarAsync(FilaItem item, string id, IReadOnlyList<string> tags, Relator relator, CancellationToken ct)
+    private async Task ExecutarAsync(FilaItem item, string id, IReadOnlyList<string> tags, bool transcricao, Relator relator,
+        CancellationToken ct)
     {
         var ytDlp = Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
         var ffmpeg = Ferramentas.Exigir(Ferramentas.Ffmpeg, "ffmpeg");
@@ -182,6 +261,19 @@ public sealed partial class DownloadYoutube(CatalogService catalogo)
                 DataAdicionado = DateTime.Now,
             });
             item.Mensagem = info.Altura > 0 ? $"Baixado em {info.Altura}p." : "Baixado.";
+
+            // 5. Transcrição (opcional): uma falha aqui não desfaz o download.
+            if (transcricao)
+            {
+                relator.Etapa("Baixando a transcrição", 0.99, 1);
+                try { item.Mensagem += " " + MensagemTranscricao(await BaixarTranscricaoAsync(id, item.Slug, json.ToString(), ct)); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    Log.Aviso($"Transcrição não obtida para {item.Slug}: {ex.Message}");
+                    item.Mensagem += $" Sem transcrição: {ex.Message}";
+                }
+            }
         }
         catch
         {

@@ -117,7 +117,7 @@ function definirRecolhida(el, recolher) {
  * Seção com título e grade de cards. Com `chave`, o título vira um botão que recolhe/expande
  * a grade (aria-expanded + aria-controls); sem `chave`, é um título comum.
  */
-function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard, chave, aoAlternar } = {}) {
+function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard, chave, aoAlternar, descricao } = {}) {
   const recolhida = chave != null && lerRecolhidas().has(chave);
   const corpo = grade(videos.map((v, i) => (montarCard ? montarCard(v, i) : cardVideo(v, opcoesCard))));
   corpo.id = `${id}-conteudo`;
@@ -138,6 +138,7 @@ function secao(titulo, videos, id, { icone: nomeIcone, opcoesCard, montarCard, c
             type: 'button', class: 'secao-alternar', 'aria-expanded': String(!recolhida), 'aria-controls': corpo.id,
             onclick: () => { definirRecolhida(el, !el.hasAttribute('data-recolhida')); aoAlternar?.(); },
           }, conteudoTitulo, h('span', { class: 'secao-seta' }, icone('expand_more', 24)))),
+    descricao ? h('p', { class: 'secao-descricao' }, descricao) : null,
     corpo);
   return el;
 }
@@ -178,7 +179,7 @@ function estadoVazio(icon, titulo, texto, acao) {
  * aoAlterarProgresso({ focarIndice }): chamado quando um vídeo sai (ou volta) da fileira
  * "Continuar assistindo" — quem chama redesenha a tela.
  */
-export function renderCatalogo(raiz, { videos, categorias, tags = [], tagsSelecionadas = [], pasta, busca, categoria },
+export function renderCatalogo(raiz, { videos, categorias, tags = [], tagsSelecionadas = [], descricoesCategorias = {}, pasta, busca, categoria },
   { aoAlterarProgresso, aoAlternarTag, aoRecarregar } = {}) {
   const conteudo = h('div', { class: 'mx-auto max-w-[1600px] px-4 pb-16 pt-9 sm:px-6' });
 
@@ -251,6 +252,7 @@ export function renderCatalogo(raiz, { videos, categorias, tags = [], tagsSeleci
         if (lista.length) {
           secoes.push(secao(c, lista, `secao-${i}`, {
             chave: recolhivel ? `categoria:${c}` : null,
+            descricao: descricoesCategorias[c],
             aoAlternar: () => atualizarBotaoTodas(),
           }));
         }

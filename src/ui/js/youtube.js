@@ -15,6 +15,7 @@ export function cardYoutube(estado) {
   const categoria = h('input', {
     id: 'yt-categoria', class: 'campo w-full', maxlength: 60, list: 'yt-categorias', autocomplete: 'off', placeholder: 'Sem categoria',
   });
+  const transcricao = h('input', { id: 'yt-transcricao', type: 'checkbox', class: 'caixa-selecao shrink-0', checked: true });
   const erro = h('p', { id: 'yt-erro', class: 'alerta-erro hidden', role: 'alert' });
   const baixar = h('button', { type: 'submit', class: 'btn-primario' }, icone('download', 18), 'Baixar');
   const versao = h('span', { class: 'text-suave' });
@@ -34,6 +35,9 @@ export function cardYoutube(estado) {
         h('datalist', { id: 'yt-categorias' },
           estado.categorias.filter((c) => c !== 'Sem categoria').map((c) => h('option', { value: c })))),
       baixar),
+    h('label', { for: 'yt-transcricao', class: 'flex cursor-pointer items-start gap-2.5 text-sm' }, transcricao,
+      h('span', {}, 'Baixar a transcrição ',
+        h('span', { class: 'text-suave' }, '(pelas legendas do vídeo: em português; se não houver, em inglês)'))),
     erro);
 
   form.addEventListener('submit', async (e) => {
@@ -51,13 +55,13 @@ export function cardYoutube(estado) {
         if (r.invalidos.length) { mostrarErro(r.invalidos[0].motivo); links.focus(); return; }
         if (r.existentes.length) { mostrarErro(`Este vídeo já está no catálogo: “${r.existentes[0].titulo}”.`); return; }
         if (r.naFila.length) { mostrarErro('Este vídeo já está na fila.'); return; }
-        await bridge.call('fila.adicionarYoutubeLote', { ids: [r.novos[0].id], categoria: categoria.value });
+        await bridge.call('fila.adicionarYoutubeLote', { ids: [r.novos[0].id], categoria: categoria.value, transcricao: transcricao.checked });
         links.value = '';
         toast('Download adicionado à fila.');
         return;
       }
 
-      const res = await modalLote(r, categoria.value, estado);
+      const res = await modalLote(r, categoria.value, transcricao.checked, estado);
       if (res) {
         links.value = '';
         toast(`${plural(res.adicionados, 'download adicionado', 'downloads adicionados')} à fila.`);
@@ -112,7 +116,7 @@ export function cardYoutube(estado) {
 }
 
 /** Conferência de vários links antes de baixar: novos (marcados), já no catálogo, na fila, repetidos e inválidos. */
-async function modalLote(r, categoriaInicial, estado) {
+async function modalLote(r, categoriaInicial, transcricaoInicial, estado) {
   const linhas = r.novos.map((n) => {
     const marcar = h('input', { type: 'checkbox', class: 'caixa-selecao mt-0.5 shrink-0', checked: true, 'aria-label': `Baixar ${n.texto}` });
     marcar.addEventListener('change', atualizar);
@@ -130,6 +134,7 @@ async function modalLote(r, categoriaInicial, estado) {
     value: categoriaInicial,
   });
   const tags = campoTags({ id: 'lote-tags', sugestoes: estado.tags ?? [] });
+  const transcricao = h('input', { id: 'lote-transcricao', type: 'checkbox', class: 'caixa-selecao shrink-0', checked: transcricaoInicial });
   const erro = h('p', { class: 'alerta-erro hidden', role: 'alert' });
   const enviar = h('button', { type: 'submit', form: 'form-lote', class: 'btn-primario' });
   function atualizar() {
@@ -164,7 +169,10 @@ async function modalLote(r, categoriaInicial, estado) {
         h('p', { class: 'mt-1 text-xs text-suave' }, 'Aplicada a todos os vídeos do lote.')),
       h('div', {},
         h('label', { for: 'lote-tags', class: 'rotulo' }, 'Tags ', h('span', { class: 'font-normal text-suave' }, '(opcional)')),
-        tags.el)) : null,
+        tags.el),
+      h('label', { for: 'lote-transcricao', class: 'flex cursor-pointer items-start gap-2.5 text-sm' }, transcricao,
+        h('span', {}, 'Baixar a transcrição de cada vídeo ',
+          h('span', { class: 'text-suave' }, '(em português; se não houver, em inglês)')))) : null,
     h('p', { class: 'text-xs text-suave' },
       'Os vídeos são baixados um de cada vez, em até 1080p. Se algum falhar (privado, removido, sem internet), os outros continuam.'),
     erro);
@@ -184,6 +192,7 @@ async function modalLote(r, categoriaInicial, estado) {
             ids: linhas.filter((l) => l.marcar.checked).map((l) => l.n.id),
             categoria: categoria.value,
             tags: tags.valores(),
+            transcricao: transcricao.checked,
           }));
         } catch (ex) {
           erro.textContent = ex.message;

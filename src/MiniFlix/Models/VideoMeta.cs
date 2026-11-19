@@ -10,6 +10,9 @@ public sealed class VideoMeta
     public string Categoria { get; set; } = "";
     public List<string> Tags { get; set; } = [];
     public bool Favorito { get; set; }
+    /// <summary>Chave da legenda usada na transcrição (ex.: "pt-BR", "pt-orig", "en"); null = sem transcrição.</summary>
+    public string? TranscricaoIdioma { get; set; }
+    public bool TranscricaoAutomatica { get; set; }
     public string Origem { get; set; } = "";          // "youtube" | "local"
     public string? UrlOrigem { get; set; }
     public double DuracaoSegundos { get; set; }
@@ -23,4 +26,5 @@ public sealed record VideoItem(
     VideoMeta Meta,
     string VideoUrl,
     string? CapaUrl,
-    long TamanhoBytes);
+    long TamanhoBytes,
+    string? TranscricaoUrl = null);

@@ -2,6 +2,7 @@ import { h, fmtData, fmtDuracao } from './util.js';
 import { icone } from './icones.js';
 import { abrirModal } from './componentes.js';
 import { botaoFavorito } from './favorito.js';
+import { secaoTranscricao } from './transcricao.js';
 import { obterProgresso, emAndamento, registrarProgresso, reiniciarProgresso } from './progresso.js';
 
 /** Intervalo entre envios de progresso durante a reprodução (o C# agrupa as gravações em disco). */
@@ -75,12 +76,13 @@ export function renderPlayer(raiz, v) {
   });
   const osd = h('div', { class: 'osd', role: 'status', 'aria-live': 'polite' });
   const tela = h('div', { class: 'tela' }, video, osd);
+  const transcricao = secaoTranscricao(v, video);
 
   const info = (nomeIcone, texto) => h('span', { class: 'inline-flex items-center gap-1.5' }, icone(nomeIcone, 18), texto);
   const meta = [
     h('span', { class: 'chip chip-marca' }, v.categoria),
     v.dataPublicacao && info('calendar_today', fmtData(v.dataPublicacao)),
-    v.duracaoSegundos && info('schedule', fmtDuracao(v.duracaoSegundos)),
+    v.duracaoSegundos > 0 && info('schedule', fmtDuracao(v.duracaoSegundos)),
     v.origem === 'youtube' && v.urlOrigem && h('a', {
       href: v.urlOrigem, target: '_blank', rel: 'noopener', class: 'inline-flex items-center gap-1.5 hover:text-destaque',
     }, icone('open_in_new', 18), 'Ver no YouTube'),
@@ -106,6 +108,7 @@ export function renderPlayer(raiz, v) {
       v.descricao && h('div', { class: 'painel mt-6 max-w-3xl px-6 py-5' },
         h('h2', { class: 'mb-2 text-sm font-semibold text-suave' }, 'Descrição'),
         h('p', { class: 'whitespace-pre-line leading-relaxed' }, v.descricao)),
+      transcricao.el,
     )));
 
   // ---------- Aviso rápido (OSD) ----------
@@ -245,6 +248,7 @@ export function renderPlayer(raiz, v) {
 
   // ---------- Limpeza ao sair da tela ----------
   return () => {
+    transcricao.limpar();
     salvarProgresso();
     window.removeEventListener('keydown', aoTeclar, { capture: true });
     window.removeEventListener('pagehide', salvarProgresso);

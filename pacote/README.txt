@@ -73,6 +73,19 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
     2. Escolha a categoria e clique em "Baixar".
     O vídeo é salvo em até 1080p, com capa e descrição.
 
+    TRANSCRIÇÃO
+      Com "Baixar a transcrição" marcado (vem marcado), o MiniFlix
+      também guarda o texto do que é falado no vídeo, a partir das
+      legendas do YouTube: em português; se o vídeo não tiver, em
+      inglês. Para vídeos do YouTube que já estão no catálogo, use
+      "Baixar transcrição" no player, ou selecione vários na tabela
+      "Acervo" e clique em "Baixar transcrições".
+      No player, o painel "Transcrição" mostra o texto com o horário
+      de cada trecho: clique no horário para pular para ele, e use a
+      busca para achar uma palavra. A transcrição também fica num
+      arquivo .md na pasta do vídeo, que abre em qualquer editor.
+      Vídeos importados do computador ainda não têm transcrição.
+
     VÁRIOS VÍDEOS DE UMA VEZ
       Cole vários links no mesmo campo: um por linha, separados por
       espaço ou vírgula, ou até um texto inteiro com links no meio
@@ -149,10 +162,10 @@ AppData. Ao remover o pendrive, nenhum rastro fica no computador.
   pode assistir, editar (título, categoria, tags e descrição) ou
   excluir. A exclusão apaga o vídeo do disco e não pode ser desfeita.
 
-  RENOMEAR UMA CATEGORIA
+  EDITAR UMA CATEGORIA (NOME E DESCRIÇÃO)
     No painel "Categorias" da Administração, clique no lápis ao lado
-    da categoria e digite o novo nome: todos os vídeos dela mudam de
-    uma vez. Se o nome já for de outra categoria, as duas viram uma
+    da categoria. Mudando o nome, todos os vídeos dela mudam de uma
+    vez. A descrição (opcional) aparece abaixo do nome no catálogo. Se o nome já for de outra categoria, as duas viram uma
     só. Em "Sem categoria", o lápis dá uma categoria a todos os vídeos
     que ainda não têm.
 

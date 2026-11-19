@@ -49,6 +49,7 @@ async function carregarCatalogo() {
   estado.videos = r.videos;
   estado.categorias = r.categorias;
   estado.tags = r.tags;
+  estado.descricoesCategorias = r.descricoesCategorias ?? {};
   estado.pasta = r.pasta;
   if (estado.categoria && !estado.categorias.includes(estado.categoria)) estado.categoria = '';
   estado.tagsSelecionadas = estado.tagsSelecionadas.filter((t) => estado.tags.includes(t));
@@ -143,11 +144,13 @@ bridge.on('catalogo.atualizado', async () => {
 const estadosAnteriores = new Map();
 // "Rodada" = tudo o que passou pela fila desde a última vez que ela ficou parada.
 // Com um item só, avisa ao terminar; com vários (lote do YouTube, pasta inteira), um resumo no fim.
-const rodada = { itens: new Set(), concluidos: 0, erros: 0 };
+const rodada = { itens: new Set(), concluidos: 0, erros: 0, tipos: new Set() };
 
 function aoMudarFila(itens) {
   const ocupada = itens.some((i) => i.estado === 'aguardando' || i.estado === 'processando');
-  for (const i of itens) if (i.estado === 'aguardando' || i.estado === 'processando') rodada.itens.add(i.id);
+  for (const i of itens) {
+    if (i.estado === 'aguardando' || i.estado === 'processando') { rodada.itens.add(i.id); rodada.tipos.add(i.tipo); }
+  }
   const emLote = rodada.itens.size > 1;
 
   for (const i of itens) {
@@ -155,7 +158,7 @@ function aoMudarFila(itens) {
     if (antes && antes !== i.estado) {
       if (i.estado === 'concluido') {
         rodada.concluidos++;
-        if (!emLote) toast(`“${i.titulo}” foi adicionado ao catálogo.`);
+        if (!emLote) toast(i.tipo === 'transcricao' ? `Transcrição de “${i.titulo}” pronta.` : `“${i.titulo}” foi adicionado ao catálogo.`);
       } else if (i.estado === 'erro') {
         rodada.erros++;
         if (!emLote) toast(`Falha em “${i.titulo}”: ${i.mensagem}`, 'erro');
@@ -167,11 +170,15 @@ function aoMudarFila(itens) {
 
   if (!ocupada && rodada.itens.size) {
     if (emLote && rodada.concluidos + rodada.erros > 0) {
-      const partes = [`${plural(rodada.concluidos, 'vídeo adicionado', 'vídeos adicionados')} ao catálogo`];
+      const soTranscricoes = rodada.tipos.size === 1 && rodada.tipos.has('transcricao');
+      const partes = [soTranscricoes
+        ? `${plural(rodada.concluidos, 'transcrição pronta', 'transcrições prontas')}`
+        : `${plural(rodada.concluidos, 'vídeo adicionado', 'vídeos adicionados')} ao catálogo`];
       if (rodada.erros) partes.push(`${plural(rodada.erros, 'com erro', 'com erro')} (detalhes na fila da Administração)`);
       toast(`Fila concluída: ${partes.join(', ')}.`, rodada.erros ? 'erro' : 'ok');
     }
     rodada.itens.clear();
+    rodada.tipos.clear();
     rodada.concluidos = 0;
     rodada.erros = 0;
   }

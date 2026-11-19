@@ -420,6 +420,53 @@ public sealed class CatalogServiceTests : IDisposable
         Assert.Equal(20, meta.Tags.Count);
     }
 
+    // ---------- Descrição das categorias ----------
+
+    [Fact]
+    public void Descricao_de_categoria_fica_na_pasta_dos_videos()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        var cat = Novo();
+        cat.Varrer();
+        cat.DefinirDescricaoCategoria("cursos", "  Aulas gravadas da faculdade. ");
+        Assert.Equal("Aulas gravadas da faculdade.", cat.DescricoesCategorias()["Cursos"]);
+        Assert.True(File.Exists(Path.Combine(Videos, "_categorias.json")));
+        cat.Varrer();
+        Assert.Single(cat.Itens); // o arquivo não vira "vídeo"
+
+        cat.DefinirDescricaoCategoria("Cursos", "");
+        Assert.Empty(cat.DescricoesCategorias());
+        Assert.Throws<ArgumentException>(() => cat.DefinirDescricaoCategoria("Sem categoria", "x"));
+        Assert.Throws<ArgumentException>(() => cat.DefinirDescricaoCategoria("Cursos", new string('x', CatalogService.MaxDescricaoCategoria + 1)));
+    }
+
+    [Fact]
+    public void Renomear_leva_a_descricao_e_unir_mantem_a_do_destino()
+    {
+        CriarVideo("a", categoria: "Cursos");
+        CriarVideo("b", categoria: "Receitas");
+        CriarVideo("c", categoria: "Doces");
+        var cat = Novo();
+        cat.Varrer();
+        cat.DefinirDescricaoCategoria("Cursos", "Aulas");
+        cat.DefinirDescricaoCategoria("Receitas", "Comida salgada");
+        cat.DefinirDescricaoCategoria("Doces", "Sobremesas");
+
+        // renomear: a descrição vai junto
+        Assert.Equal(1, cat.EditarCategoria("Cursos", "Faculdade", null));
+        Assert.Equal("Aulas", cat.DescricoesCategorias()["Faculdade"]);
+        Assert.False(cat.DescricoesCategorias().ContainsKey("Cursos"));
+
+        // unir Doces em Receitas: fica a descrição de Receitas e a de Doces some
+        Assert.Equal(1, cat.EditarCategoria("Doces", "receitas", null));
+        Assert.Equal("Comida salgada", cat.DescricoesCategorias()["Receitas"]);
+        Assert.False(cat.DescricoesCategorias().ContainsKey("Doces"));
+
+        // só a descrição (mesmo nome)
+        Assert.Equal(0, cat.EditarCategoria("Receitas", "Receitas", "Pratos do dia a dia"));
+        Assert.Equal("Pratos do dia a dia", cat.DescricoesCategorias()["Receitas"]);
+    }
+
     // ---------- Categoria em massa ----------
 
     [Fact]

@@ -24,7 +24,8 @@
 - 🔁 **Reconhece vídeos já importados** (tamanho + amostras do início, meio e fim do arquivo — não o nome), com opção de reimportar mantendo título, tags, favorito, capa e progresso; **importação de pastas inteiras** com subpastas (categoria pelo nome da subpasta).
 - 📁 **Importar vídeos do computador** sem perder qualidade: o que o player toca é copiado bit a bit; áudio incompatível vira FLAC (sem perda); só vídeos que não tocam (HEVC, WMV…) são reconvertidos, em alta qualidade e na resolução original.
 - 🗂️ **Gerenciar o acervo:** editar título, categoria, tags e descrição, ou excluir vídeos.
-- ✏️ **Renomear categoria:** muda todos os vídeos dela de uma vez (ou une com uma categoria existente).
+- ✏️ **Editar categoria:** renomear muda todos os vídeos dela de uma vez (ou une com uma existente); descrição opcional exibida no catálogo.
+- 📝 **Transcrição dos vídeos do YouTube** pelas legendas (português; senão, inglês): `<slug>.transcricao.md` na pasta do vídeo e painel no player com horários clicáveis e busca.
 - ⭐ **Favoritos:** estrela no player e na administração; os favoritos ganham uma fileira própria no catálogo.
 - 🔎 **Filtros do acervo:** texto, categoria, tags, “Sem tags” e “Só favoritos”, combináveis.
 - 🏷️ **Tags:** cada vídeo pode ter várias tags; o catálogo filtra por uma ou mais delas (o vídeo precisa ter todas). Na administração, dá para selecionar vários vídeos e mudar a categoria ou adicionar/remover tags de uma vez; a importação também aceita tags.

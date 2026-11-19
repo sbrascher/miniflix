@@ -97,6 +97,7 @@ internal sealed class MainForm : Form
             videos = _catalogo.Itens.Select(ParaUi),
             categorias = _catalogo.Categorias(),
             tags = _catalogo.Tags(),
+            descricoesCategorias = _catalogo.DescricoesCategorias(),
             pasta = InfoPasta(),
         });
         _bridge.Registrar("catalogo.recarregar", async _ =>
@@ -166,6 +167,15 @@ internal sealed class MainForm : Form
             var antiga = Bridge.Texto(d, "antiga");
             var nova = d?["nova"]?.GetValue<string>();
             var alterados = await Task.Run(() => _catalogo.RenomearCategoria(antiga, nova));
+            return (object?)new { alterados };
+        });
+        // Nome + descrição (opcional) de uma categoria.
+        _bridge.Registrar("categoria.editar", async d =>
+        {
+            var antiga = Bridge.Texto(d, "antiga");
+            var nova = d?["nova"]?.GetValue<string>() ?? antiga;
+            var descricao = d?["descricao"]?.GetValue<string>(); // ausente = manter
+            var alterados = await Task.Run(() => _catalogo.EditarCategoria(antiga, nova, descricao));
             return (object?)new { alterados };
         });
         _bridge.Registrar("video.excluir", async d =>
@@ -348,10 +358,32 @@ internal sealed class MainForm : Form
                       ?? throw new ArgumentException("Nenhum vídeo informado.");
             var naFila = _fila.Itens.Where(i => !i.Finalizado && i.Tipo == "youtube").Select(i => i.Origem).ToHashSet();
             // Cria todos antes de enfileirar: um ID inválido não deixa o lote pela metade.
+            var transcricao = d?["transcricao"]?.GetValue<bool>() ?? false;
             var itens = ids.Where(id => !naFila.Contains(DownloadYoutube.UrlCanonica(id)))
-                .Select(id => _youtube.CriarItem(DownloadYoutube.UrlCanonica(id), categoria, tags)).ToList();
+                .Select(id => _youtube.CriarItem(DownloadYoutube.UrlCanonica(id), categoria, tags, transcricao)).ToList();
             foreach (var item in itens) _fila.Adicionar(item);
             return new { adicionados = itens.Count };
+        });
+
+        // Transcrição de vídeos do YouTube que já estão no catálogo (um ou vários).
+        _bridge.Registrar("transcricao.gerar", d =>
+        {
+            Ferramentas.Exigir(Ferramentas.YtDlp, "yt-dlp");
+            var slugs = (d?["slugs"] as JsonArray)?.Select(n => n?.GetValue<string>()).OfType<string>().Distinct().ToList() ?? [];
+            var naFila = _fila.Itens.Where(i => !i.Finalizado && i.Tipo == "transcricao").Select(i => i.Origem).ToHashSet();
+            int adicionados = 0, ignorados = 0;
+            foreach (var slug in slugs)
+            {
+                var v = _catalogo.Obter(slug);
+                if (v is null || !v.Meta.Id.StartsWith("yt:") || naFila.Contains(DownloadYoutube.UrlCanonica(v.Meta.Id[3..])))
+                {
+                    ignorados++;
+                    continue;
+                }
+                _fila.Adicionar(_youtube.CriarItemTranscricao(slug));
+                adicionados++;
+            }
+            return new { adicionados, ignorados };
         });
 
         _bridge.Registrar("fila.adicionarYoutube", d =>
@@ -521,6 +553,9 @@ internal sealed class MainForm : Form
         i.Meta.Categoria,
         i.Meta.Tags,
         i.Meta.Favorito,
+        i.TranscricaoUrl,
+        i.Meta.TranscricaoIdioma,
+        i.Meta.TranscricaoAutomatica,
         i.Meta.Origem,
         i.Meta.UrlOrigem,
         i.Meta.DuracaoSegundos,

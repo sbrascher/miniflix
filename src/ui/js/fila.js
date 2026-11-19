@@ -87,7 +87,7 @@ function linhaFila(i) {
     h('div', { class: 'pastilha' },
       i.estado === 'processando'
         ? h('span', { class: 'flex animate-spin' }, icone('progress_activity', 22))
-        : icone(i.tipo === 'youtube' ? 'smart_display' : 'upload_file', 22)),
+        : icone(i.tipo === 'youtube' ? 'smart_display' : i.tipo === 'transcricao' ? 'subtitles' : 'upload_file', 22)),
     h('div', { class: 'min-w-0 flex-1' },
       h('p', { class: 'truncate font-medium' }, i.titulo),
       h('p', { class: 'truncate text-xs text-suave' }, [i.origem, i.categoria].filter(Boolean).join(' · ')),

@@ -32,6 +32,8 @@ export function criarSelecao(estado) {
   const btnRemover = h('button', { type: 'button', class: 'btn' }, icone('label_off', 18), 'Remover tags…');
   const btnCategoria = h('button', { type: 'button', class: 'btn' }, icone('folder_special', 18), 'Mudar categoria…');
   btnCategoria.addEventListener('click', () => mudarCategoria(estado));
+  const btnTranscricoes = h('button', { type: 'button', class: 'btn' }, icone('subtitles', 18), 'Baixar transcrições');
+  btnTranscricoes.addEventListener('click', () => baixarTranscricoes(estado));
   const btnLimpar = h('button', { type: 'button', class: 'btn' }, icone('close', 18), 'Limpar seleção');
   btnAdicionar.addEventListener('click', () => adicionarTags(estado));
   btnRemover.addEventListener('click', () => removerTags(estado));
@@ -40,7 +42,7 @@ export function criarSelecao(estado) {
   const barra = h('div', { class: 'barra-selecao hidden', role: 'region', 'aria-label': 'Ações para os vídeos selecionados' },
     h('span', { class: 'pastilha h-9 w-9' }, icone('checklist', 20)),
     h('div', { class: 'mr-auto flex flex-wrap items-baseline gap-x-2' }, contador, ocultos),
-    btnCategoria, btnAdicionar, btnRemover, btnLimpar);
+    btnCategoria, btnAdicionar, btnRemover, btnTranscricoes, btnLimpar);
 
   function atualizar() {
     const n = selecionados.size;
@@ -252,4 +254,36 @@ async function mudarCategoria(estado) {
   toast(res.alterados
     ? `Categoria alterada em ${plural(res.alterados, 'vídeo', 'vídeos')}.`
     : 'Os vídeos selecionados já estavam nessa categoria.');
+}
+
+/** Baixa as transcrições (legendas) dos vídeos do YouTube selecionados. */
+async function baixarTranscricoes(estado) {
+  const videos = videosSelecionados(estado);
+  const doYoutube = videos.filter((v) => v.origem === 'youtube');
+  if (!doYoutube.length) {
+    toast('Por enquanto a transcrição vem das legendas do YouTube: nenhum dos selecionados foi baixado de lá.', 'erro');
+    return;
+  }
+  const jaTem = doYoutube.filter((v) => v.transcricaoUrl).length;
+  const r = await abrirModal({
+    titulo: 'Baixar transcrições',
+    corpo: h('div', { class: 'space-y-3 text-sm' },
+      h('p', {}, `${plural(doYoutube.length, 'vídeo do YouTube', 'vídeos do YouTube')} entre os selecionados. `,
+        'A transcrição vem das legendas do vídeo: em português; se não houver, em inglês. Precisa de internet.'),
+      videos.length > doYoutube.length
+        ? h('p', { class: 'text-suave' }, `${plural(videos.length - doYoutube.length, 'vídeo do computador fica', 'vídeos do computador ficam')} de fora (sem legendas do YouTube).`)
+        : null,
+      jaTem ? h('p', { class: 'text-suave' }, `${plural(jaTem, 'já tem transcrição e será atualizado', 'já têm transcrição e serão atualizados')}.`) : null),
+    acoes: (fechar) => [
+      h('button', { type: 'button', class: 'btn', onclick: () => fechar(false) }, 'Cancelar'),
+      h('button', { type: 'button', class: 'btn-primario', autofocus: true, onclick: () => fechar(true) }, icone('subtitles', 18), 'Baixar'),
+    ],
+  });
+  if (!r) return;
+  try {
+    const res = await bridge.call('transcricao.gerar', { slugs: doYoutube.map((v) => v.slug) });
+    toast(`${plural(res.adicionados, 'transcrição adicionada', 'transcrições adicionadas')} à fila.`);
+  } catch (e) {
+    toast(e.message, 'erro');
+  }
 }
